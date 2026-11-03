@@ -4,7 +4,9 @@ package com.example.cauca_resilente_app.ui.Screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -16,9 +18,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cauca_resilente_app.api.User
 import com.example.cauca_resilente_app.ui.theme.AzulInstitucional
 import com.example.cauca_resilente_app.ui.theme.AzulOscuro
 import com.example.cauca_resilente_app.ui.theme.FondoClaro
+import com.example.cauca_resilente_app.ui.theme.GrisInactivo
 import com.example.cauca_resilente_app.ui.theme.RojoEmergencia
 import com.example.cauca_resilente_app.ui.theme.TextoBlanco
 import com.example.cauca_resilente_app.ui.theme.TextoOscuro
@@ -26,7 +30,8 @@ import com.example.cauca_resilente_app.ui.theme.VerdeSeguro
 
 @Composable
 fun HomeScreen(
-    userName: String,
+    user: User?,
+    estadoActual: EstadoUsuario,
     onNotificacionesClick: () -> Unit,
     onMiEstadoClick: () -> Unit,
     onSolicitarAyudaClick: () -> Unit,
@@ -65,7 +70,7 @@ fun HomeScreen(
                 ) {
                     Column {
                         Text(
-                            text = "Hola, $userName 👋",
+                            text = "Hola, ${user?.name?.takeIf { it.isNotBlank() } ?: "Usuario"} 👋",
                             color = TextoBlanco,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Bold
@@ -89,54 +94,35 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Tarjeta "Tu estado actual"
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = VerdeSeguro.copy(alpha = 0.15f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "TU ESTADO ACTUAL",
-                                fontSize = 11.sp,
-                                color = VerdeSeguro,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                "Estoy bien",
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VerdeSeguro
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "Última actualización: 9:41 a. m.",
-                                fontSize = 12.sp,
-                                color = TextoBlanco.copy(alpha = 0.8f),
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(VerdeSeguro, RoundedCornerShape(50)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Filled.Check, contentDescription = null, tint = TextoBlanco)
-                        }
-                    }
+
+
+                val colorEstado = when (estadoActual) {
+                    EstadoUsuario.A_SALVO -> VerdeSeguro
+                    EstadoUsuario.EN_RIESGO -> Color(0xFFF9A825)
+                    EstadoUsuario.ATRAPADO -> RojoEmergencia
+                    EstadoUsuario.DESAPARECIDO -> GrisInactivo
                 }
+                val textoEstado = estadoActual.titulo
+
+
+                Card(colors = CardDefaults.cardColors(containerColor = colorEstado.copy(alpha = 0.15f))) {
+                    Text(textoEstado, color = colorEstado,)
+                }
+
             }
 
             // ===== CONTENIDO SCROLLEABLE =====
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(20.dp)
             ) {
+                // ===== DATOS DEL USUARIO =====
+
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Grid 2x2 de accesos rápidos
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     QuickAccessCard(
@@ -200,13 +186,14 @@ fun HomeScreen(
                         ) {
                             Column {
                                 Text(
-                                    "Calle 5 # 3-15, Popayán",
+                                    user?.direccion?.takeIf { it.isNotBlank() }
+                                        ?: "Sin ubicación registrada",
                                     color = TextoBlanco,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    "9:41 a. m. • 12/05/2024",
+                                    "Actualiza tu ubicación desde Mi ubicación",
                                     color = TextoBlanco.copy(alpha = 0.7f),
                                     fontSize = 12.sp
                                 )
@@ -229,6 +216,41 @@ fun HomeScreen(
     }
 }
 
+
+@Composable
+private fun DatoUsuario(
+    icon: ImageVector,
+    label: String,
+    value: String?
+) {
+    if (value.isNullOrBlank()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = AzulInstitucional,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            label,
+            fontSize = 12.sp,
+            color = TextoOscuro.copy(alpha = 0.6f),
+            modifier = Modifier.width(72.dp)
+        )
+        Text(
+            value,
+            fontSize = 13.sp,
+            color = TextoOscuro,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
 
 @Composable
 private fun QuickAccessCard(

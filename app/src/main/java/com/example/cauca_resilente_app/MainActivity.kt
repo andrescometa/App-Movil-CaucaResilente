@@ -30,13 +30,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cauca_resilente_app.api.SessionManager
 import com.example.cauca_resilente_app.ui.Navigation.AppNavigation
 import com.example.cauca_resilente_app.ui.theme.AmarilloInstitucional
 import com.example.cauca_resilente_app.ui.theme.TextoBlanco
+import org.maplibre.android.MapLibre
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SessionManager.init(this)
+        MapLibre.getInstance(this)
         enableEdgeToEdge()
         setContent {
             Cauca_Resilente_AppTheme {

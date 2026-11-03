@@ -1,6 +1,4 @@
-package com.example.cauca_resilente_app.ui.Screens
-
-// ui/screens/InformacionAlertasScreen.kt
+package com.example.cauca_resilente_app.ui.Screens// ui/screens/InformacionAlertasScreen.kt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -17,81 +16,47 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.cauca_resilente_app.ui.theme.AzulOscuro
-import com.example.cauca_resilente_app.ui.theme.FondoClaro
-import com.example.cauca_resilente_app.ui.theme.RojoEmergencia
-import com.example.cauca_resilente_app.ui.theme.TextoBlanco
-import com.example.cauca_resilente_app.ui.theme.TextoOscuro
-import com.example.cauca_resilente_app.ui.theme.VerdeSeguro
-
-// Modelo de datos
-data class ItemInformacion(
-    val categoria: String,
-    val colorCategoria: Color,
-    val titulo: String,
-    val descripcion: String,
-    val fecha: String
-)
-
-// Datos de ejemplo
-private val noticias = listOf(
-    ItemInformacion(
-        categoria = "Alerta",
-        colorCategoria = Color(0xFFF9A825),
-        titulo = "Simulacro departamental",
-        descripcion = "Este 20 de mayo se realizará el simulacro de respuesta a emergencias en todo el Cauca.",
-        fecha = "12/05/2024 • 8:30 a. m."
-    )
-)
-
-private val alertas = listOf(
-    ItemInformacion(
-        categoria = "Alerta",
-        colorCategoria = RojoEmergencia,
-        titulo = "Lluvias intensas en el norte del Cauca",
-        descripcion = "Se prevén lluvias fuertes durante las próximas horas. Mantente informado y sigue las recomendaciones.",
-        fecha = "12/05/2024 • 7:15 a. m."
-    )
-)
-
-private val recomendaciones = listOf(
-    ItemInformacion(
-        categoria = "Recomendación",
-        colorCategoria = VerdeSeguro,
-        titulo = "Kit de emergencia",
-        descripcion = "Ten siempre a mano agua, alimentos no perecederos, linterna y botiquín básico.",
-        fecha = "10/05/2024 • 9:00 a. m."
-    )
-)
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.cauca_resilente_app.api.AlertItem
+import com.example.cauca_resilente_app.ui.ViewModels.AlertasViewModel
+import com.example.cauca_resilente_app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InformacionAlertasScreen(
     onBackClick: () -> Unit,
-    onVerMasClick: (ItemInformacion) -> Unit
+    onVerMasClick: (AlertItem) -> Unit,
+    viewModel: AlertasViewModel,
+    tabInicial: Int = 0
 ) {
-    var tabSeleccionada by remember { mutableStateOf(0) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var tabSeleccionada by remember { mutableIntStateOf(tabInicial) }
     val tabs = listOf("Noticias", "Alertas", "Recomendaciones")
+    val categorias = listOf("Noticia", "Alerta", "Recomendación")
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Mostrar error
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.limpiarError()
+        }
+    }
 
     Scaffold(
         containerColor = TextoBlanco,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        "Información y alertas",
-                        color = TextoBlanco,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                },
+                title = { Text("Información y alertas", color = TextoBlanco, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = TextoBlanco
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextoBlanco)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.cargarAlertas() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Recargar", tint = TextoBlanco)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = AzulOscuro)
@@ -99,9 +64,7 @@ fun InformacionAlertasScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+            modifier = Modifier.fillMaxSize().padding(padding)
         ) {
             // ===== TABS =====
             TabRow(
@@ -116,9 +79,7 @@ fun InformacionAlertasScreen(
                         color = AzulOscuro
                     )
                 },
-                divider = {
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-                }
+                divider = { HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f)) }
             ) {
                 tabs.forEachIndexed { index, titulo ->
                     Tab(
@@ -136,36 +97,48 @@ fun InformacionAlertasScreen(
                 }
             }
 
-            // ===== CONTENIDO SEGÚN TAB =====
-            val listaActual = when (tabSeleccionada) {
-                0 -> noticias
-                1 -> alertas
-                else -> recomendaciones
-            }
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp),
-                contentPadding = PaddingValues(vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                items(listaActual) { item ->
-                    TarjetaInformacion(item = item, onClick = { onVerMasClick(item) })
+            // ===== CONTENIDO =====
+            when {
+                uiState.isLoading && uiState.alertas.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AzulOscuro)
+                    }
                 }
+                else -> {
+                    val listaActual = uiState.alertas.filter {
+                        it.category.equals(categorias[tabSeleccionada], ignoreCase = true)
+                    }
 
-                // Botón "Ver más información"
-                item {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Button(
-                        onClick = { /* TODO */ },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = AzulOscuro),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Ver más información", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    if (listaActual.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                "No hay contenido disponible en esta categoría.",
+                                color = TextoOscuro.copy(alpha = 0.6f),
+                                fontSize = 14.sp
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+                            contentPadding = PaddingValues(vertical = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            items(listaActual) { item ->
+                                TarjetaInformacion(item = item, onClick = { onVerMasClick(item) })
+                            }
+
+                            item {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Button(
+                                    onClick = { viewModel.cargarAlertas() },
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AzulOscuro),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Ver más información", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -174,7 +147,13 @@ fun InformacionAlertasScreen(
 }
 
 @Composable
-private fun TarjetaInformacion(item: ItemInformacion, onClick: () -> Unit) {
+private fun TarjetaInformacion(item: AlertItem, onClick: () -> Unit) {
+    val colorCategoria = when (item.category.lowercase()) {
+        "alerta" -> RojoEmergencia
+        "recomendación", "recomendacion" -> VerdeSeguro
+        else -> Color(0xFFF9A825) // Noticia
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -182,45 +161,21 @@ private fun TarjetaInformacion(item: ItemInformacion, onClick: () -> Unit) {
         onClick = onClick
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Chip de categoría
+            // Chip categoría
             Box(
                 modifier = Modifier
-                    .background(item.colorCategoria, RoundedCornerShape(50))
+                    .background(colorCategoria, RoundedCornerShape(50))
                     .padding(horizontal = 12.dp, vertical = 4.dp)
             ) {
-                Text(
-                    item.categoria,
-                    color = TextoBlanco,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text(item.category, color = TextoBlanco, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                item.titulo,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextoOscuro
-            )
-
+            Text(item.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoOscuro)
             Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                item.descripcion,
-                fontSize = 13.sp,
-                color = TextoOscuro.copy(alpha = 0.7f),
-                lineHeight = 18.sp
-            )
-
+            Text(item.description, fontSize = 13.sp, color = TextoOscuro.copy(alpha = 0.7f), lineHeight = 18.sp)
             Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                item.fecha,
-                fontSize = 11.sp,
-                color = TextoOscuro.copy(alpha = 0.5f)
-            )
+            Text("${item.date} • ${item.time}", fontSize = 11.sp, color = TextoOscuro.copy(alpha = 0.5f))
         }
     }
 }

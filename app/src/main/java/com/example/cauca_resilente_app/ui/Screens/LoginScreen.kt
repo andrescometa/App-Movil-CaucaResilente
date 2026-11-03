@@ -1,22 +1,16 @@
+
 package com.example.cauca_resilente_app.ui.Screens
 
-// ui/screens/LoginScreen.kt
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+// ui/screens/LoginScreen.kt (actualizado)
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,36 +21,36 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.cauca_resilente_app.ui.ViewModels.AuthViewModel
 import com.example.cauca_resilente_app.ui.theme.AzulInstitucional
 import com.example.cauca_resilente_app.ui.theme.AzulOscuro
+import com.example.cauca_resilente_app.ui.theme.RojoEmergencia
 import com.example.cauca_resilente_app.ui.theme.TextoBlanco
 import com.example.cauca_resilente_app.ui.theme.TextoOscuro
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onBackClick: () -> Unit,
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (String) -> Unit, // recibe el parametro string el nombre
     onRegisterClick: () -> Unit,
-    onForgotPasswordClick: () -> Unit
+    onForgotPasswordClick: () -> Unit,
+    viewModel: AuthViewModel = viewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var passwordVisible by remember { mutableStateOf(false) }
+
+
 
     Scaffold(
         containerColor = TextoBlanco,
         topBar = {
             IconButton(onClick = onBackClick, modifier = Modifier.padding(8.dp)) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Volver",
-                    tint = AzulOscuro
-                )
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = AzulOscuro)
             }
         }
     ) { padding ->
@@ -70,32 +64,23 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "Bienvenido",
-                color = AzulOscuro,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text("Bienvenido", color = AzulOscuro, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Inicia sesión para continuar",
-                color = TextoOscuro.copy(alpha = 0.6f),
-                fontSize = 15.sp
-            )
+            Text("Inicia sesión para continuar", color = TextoOscuro.copy(alpha = 0.6f), fontSize = 15.sp)
 
             Spacer(modifier = Modifier.height(40.dp))
 
             // Campo Correo
             OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
+                value = uiState.email,
+                onValueChange = viewModel::onEmailChange,
                 label = { Text("Correo electrónico") },
-                leadingIcon = {
-                    Icon(Icons.Filled.Email, contentDescription = null, tint = AzulOscuro)
-                },
+                leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null, tint = AzulOscuro) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                isError = uiState.errorMessage != null,
+                enabled = !uiState.isLoading,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AzulOscuro,
                     unfocusedBorderColor = Color.LightGray
@@ -106,16 +91,14 @@ fun LoginScreen(
 
             // Campo Contraseña
             OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
+                value = uiState.password,
+                onValueChange = viewModel::onPasswordChange,
                 label = { Text("Contraseña") },
-                leadingIcon = {
-                    Icon(Icons.Filled.Lock, contentDescription = null, tint = AzulOscuro)
-                },
+                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = AzulOscuro) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                            if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                             contentDescription = "Mostrar contraseña",
                             tint = AzulOscuro
                         )
@@ -125,76 +108,87 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                isError = uiState.errorMessage != null,
+                enabled = !uiState.isLoading,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = AzulOscuro,
                     unfocusedBorderColor = Color.LightGray
                 )
             )
 
+            // Mensaje de error
+            if (uiState.errorMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    uiState.errorMessage!!,
+                    color = RojoEmergencia,
+                    fontSize = 13.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Olvidé contraseña
             Text(
-                text = "¿Olvidaste tu contraseña?",
+                "¿Olvidaste tu contraseña?",
                 color = AzulInstitucional,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .align(Alignment.End)
-                    .clickable { onForgotPasswordClick() }
+                    .clickable(enabled = !uiState.isLoading) { onForgotPasswordClick() }
             )
 
             Spacer(modifier = Modifier.height(28.dp))
 
             // Botón Iniciar Sesión
             Button(
-                onClick = onLoginSuccess,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
+                onClick = { viewModel.login() },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AzulOscuro),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !uiState.isLoading
             ) {
-                Text("Iniciar sesión", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = TextoBlanco,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Iniciar sesión", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Separador "o continúa con"
+            // Separador
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray)
-                Text(
-                    text = "o continúa con",
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    color = TextoOscuro.copy(alpha = 0.6f),
-                    fontSize = 13.sp
-                )
+                Text("o continúa con", modifier = Modifier.padding(horizontal = 12.dp),
+                    color = TextoOscuro.copy(alpha = 0.6f), fontSize = 13.sp)
                 HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Botones sociales
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 SocialButton(text = "G", modifier = Modifier.weight(1f))
                 SocialButton(text = "f", modifier = Modifier.weight(1f))
-                SocialButton(text = "🍎", modifier = Modifier.weight(1f))
+                SocialButton(text = "I", modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Crear cuenta
             Row {
                 Text("¿No tienes cuenta? ", color = TextoOscuro, fontSize = 14.sp)
                 Text(
-                    text = "Crear cuenta",
+                    "Crear cuenta",
                     color = AzulInstitucional,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onRegisterClick() }
+                    modifier = Modifier.clickable(enabled = !uiState.isLoading) { onRegisterClick() }
                 )
             }
             Spacer(modifier = Modifier.height(24.dp))

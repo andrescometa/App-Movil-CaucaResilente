@@ -1,87 +1,170 @@
 package com.example.cauca_resilente_app.ui.Screens
 
-// ui/screens/MapaEmergenciaScreen.kt
-import androidx.compose.foundation.Canvas
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.cauca_resilente_app.location.obtenerUbicacionActual
+import com.example.cauca_resilente_app.location.tienePermisoUbicacion
+import com.example.cauca_resilente_app.ui.ViewModels.FiltroMapa
+import com.example.cauca_resilente_app.ui.ViewModels.MapaViewModel
+import com.example.cauca_resilente_app.ui.components.MapaLibreView
+import com.example.cauca_resilente_app.ui.components.PuntoMapa
+import com.example.cauca_resilente_app.ui.components.TipoPuntoMapa
 import com.example.cauca_resilente_app.ui.theme.AzulOscuro
 import com.example.cauca_resilente_app.ui.theme.FondoClaro
-import com.example.cauca_resilente_app.ui.theme.RojoEmergencia
 import com.example.cauca_resilente_app.ui.theme.TextoBlanco
 import com.example.cauca_resilente_app.ui.theme.TextoOscuro
-import com.example.cauca_resilente_app.ui.theme.VerdeSeguro
+import org.maplibre.android.geometry.LatLng
 
-// Enum de filtros
-enum class FiltroMapa(val titulo: String) {
-    TODOS("Todos"),
-    USUARIOS("Usuarios"),
-    AYUDA("Ayuda"),
-    ALERTAS("Alertas")
-}
-
-// Modelo para los puntos de concentración
-data class PuntoConcentracion(
-    val x: Float, // posición relativa 0f..1f
-    val y: Float,
-    val cantidad: Int,
-    val color: Color,
-    val tipo: FiltroMapa
-)
-
-// Datos de ejemplo
-private val puntosEjemplo = listOf(
-    PuntoConcentracion(0.30f, 0.25f, 3, VerdeSeguro, FiltroMapa.USUARIOS),
-    PuntoConcentracion(0.65f, 0.45f, 12, RojoEmergencia, FiltroMapa.ALERTAS),
-    PuntoConcentracion(0.20f, 0.55f, 7, Color(0xFFF9A825), FiltroMapa.AYUDA),
-    PuntoConcentracion(0.60f, 0.75f, 2, VerdeSeguro, FiltroMapa.USUARIOS)
-)
-
-// Posiciones de los marcadores tipo pin
-private val marcadoresEjemplo = listOf(
-    0.45f to 0.12f,
-    0.80f to 0.30f,
-    0.25f to 0.78f
-)
+private const val LATITUD_POR_DEFECTO = 2.4448
+private const val LONGITUD_POR_DEFECTO = -76.6147
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapaEmergenciaScreen(
     onMenuClick: () -> Unit,
     onNavItemSelected: (Int) -> Unit,
-    onSosClick: () -> Unit
+    onSosClick: () -> Unit,
+    viewModel: MapaViewModel
 ) {
-    var filtroSeleccionado by remember { mutableStateOf(FiltroMapa.TODOS) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Filtrar puntos según selección
-    val puntosVisibles = if (filtroSeleccionado == FiltroMapa.TODOS) {
-        puntosEjemplo
-    } else {
-        puntosEjemplo.filter { it.tipo == filtroSeleccionado }
+    var ubicacionActual by remember { mutableStateOf<LatLng?>(null) }
+    var permisoConcedido by remember { mutableStateOf(tienePermisoUbicacion(context)) }
+    var centrarEnUbicacion by remember { mutableIntStateOf(0) }
+
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { resultado ->
+        permisoConcedido = resultado.values.any { it } || tienePermisoUbicacion(context)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.cargarDatos()
+        if (!tienePermisoUbicacion(context)) {
+            launcher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(permisoConcedido) {
+        if (permisoConcedido) {
+            obtenerUbicacionActual(context)?.let { location ->
+                val punto = LatLng(location.latitude, location.longitude)
+                ubicacionActual = punto
+                viewModel.actualizarUbicacion(location.latitude, location.longitude)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { mensaje ->
+            snackbarHostState.showSnackbar(mensaje)
+        }
+    }
+
+    val mostrarTodo = uiState.filtroSeleccionado == FiltroMapa.TODOS
+    val puntos = buildList {
+        if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.ALERTAS) {
+            uiState.zonas.forEach { zona ->
+                val latitud = zona.latitud
+                val longitud = zona.longitud
+                if (latitud != null && longitud != null) {
+                    add(
+                        PuntoMapa(
+                            latitud = latitud,
+                            longitud = longitud,
+                            titulo = zona.nombreZona ?: "Zona de riesgo",
+                            descripcion = listOfNotNull(
+                                zona.tipoRiesgo,
+                                zona.nivelPeligro?.let { "Peligro $it" },
+                                zona.descripcion
+                            ).joinToString(" • "),
+                            tipo = TipoPuntoMapa.ZONA
+                        )
+                    )
+                }
+            }
+        }
+
+        if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.AYUDA) {
+            uiState.solicitudes.forEach { solicitud ->
+                val latitud = solicitud.latitud
+                val longitud = solicitud.longitud
+                if (latitud != null && longitud != null) {
+                    add(
+                        PuntoMapa(
+                            latitud = latitud,
+                            longitud = longitud,
+                            titulo = "Solicitud: ${solicitud.tipoAyuda ?: "Ayuda"}",
+                            descripcion = listOfNotNull(
+                                solicitud.descripcionEmergencia,
+                                solicitud.nivelPrioridad?.let { "Prioridad $it" },
+                                solicitud.estadoSolicitud
+                            ).joinToString(" • "),
+                            tipo = TipoPuntoMapa.SOLICITUD
+                        )
+                    )
+                }
+            }
+        }
+
+        if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.USUARIOS) {
+            uiState.usuarios.forEach { usuario ->
+                add(
+                    PuntoMapa(
+                        latitud = usuario.latitude,
+                        longitud = usuario.longitude,
+                        titulo = usuario.name ?: "Usuario",
+                        descripcion = "Ubicación reportada",
+                        tipo = TipoPuntoMapa.USUARIO
+                    )
+                )
+            }
+        }
+
+        val ubicacion = ubicacionActual
+        if ((mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.USUARIOS) && ubicacion != null) {
+            add(
+                PuntoMapa(
+                    latitud = ubicacion.latitude,
+                    longitud = ubicacion.longitude,
+                    titulo = "Mi ubicación",
+                    descripcion = "Tu posición actual",
+                    tipo = TipoPuntoMapa.USUARIO
+                )
+            )
+        }
     }
 
     Scaffold(
         containerColor = FondoClaro,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             BottomNavBar(
                 selectedItem = 1,
@@ -95,10 +178,13 @@ fun MapaEmergenciaScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // ===== FONDO TIPO MAPA (Canvas) =====
-            MapaCanvasPlaceholder(
-                puntos = puntosVisibles,
-                marcadores = marcadoresEjemplo
+            MapaLibreView(
+                puntos = puntos,
+                centroInicial = LatLng(LATITUD_POR_DEFECTO, LONGITUD_POR_DEFECTO),
+                zoomInicial = 13.5,
+                centrarEn = ubicacionActual,
+                solicitudCentrado = centrarEnUbicacion,
+                modifier = Modifier.fillMaxSize()
             )
 
             // ===== ENCABEZADO SUPERPUESTO =====
@@ -107,7 +193,6 @@ fun MapaEmergenciaScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 16.dp)
             ) {
-                // Barra superior con menú, título y filtro
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -125,6 +210,17 @@ fun MapaEmergenciaScreen(
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
                     )
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = TextoBlanco,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    IconButton(onClick = { viewModel.cargarDatos() }) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Recargar", tint = TextoBlanco)
+                    }
                     IconButton(onClick = { /* TODO: opciones de filtro avanzado */ }) {
                         Icon(Icons.Filled.FilterList, contentDescription = "Filtros", tint = TextoBlanco)
                     }
@@ -132,7 +228,6 @@ fun MapaEmergenciaScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Chips de filtro
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -140,16 +235,16 @@ fun MapaEmergenciaScreen(
                     FiltroMapa.entries.forEach { filtro ->
                         FiltroChip(
                             filtro = filtro,
-                            seleccionado = filtroSeleccionado == filtro,
-                            onClick = { filtroSeleccionado = filtro }
+                            seleccionado = uiState.filtroSeleccionado == filtro,
+                            onClick = { viewModel.cambiarFiltro(filtro) }
                         )
                     }
                 }
             }
 
-            // ===== BOTÓN DE UBICACIÓN ACTUAL (esquina inferior derecha) =====
+            // ===== BOTÓN DE UBICACIÓN ACTUAL =====
             FloatingActionButton(
-                onClick = { /* TODO: centrar en ubicación actual */ },
+                onClick = { centrarEnUbicacion++ },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 20.dp, bottom = 20.dp)
@@ -159,115 +254,6 @@ fun MapaEmergenciaScreen(
                 shape = CircleShape
             ) {
                 Icon(Icons.Filled.MyLocation, contentDescription = "Mi ubicación")
-            }
-        }
-    }
-}
-
-@Composable
-private fun MapaCanvasPlaceholder(
-    puntos: List<PuntoConcentracion>,
-    marcadores: List<Pair<Float, Float>>
-) {
-    Canvas(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE8F0E3))
-    ) {
-        val w = size.width
-        val h = size.height
-
-        // Dibujar "calles" (líneas blancas)
-        drawLine(
-            color = Color.White.copy(alpha = 0.7f),
-            start = Offset(0f, h * 0.3f),
-            end = Offset(w, h * 0.35f),
-            strokeWidth = 8f
-        )
-        drawLine(
-            color = Color.White.copy(alpha = 0.7f),
-            start = Offset(w * 0.4f, 0f),
-            end = Offset(w * 0.45f, h),
-            strokeWidth = 8f
-        )
-        drawLine(
-            color = Color.White.copy(alpha = 0.7f),
-            start = Offset(0f, h * 0.7f),
-            end = Offset(w, h * 0.65f),
-            strokeWidth = 6f
-        )
-
-        // "Río" (curva azul)
-        drawLine(
-            color = Color(0xFF9CC8E6),
-            start = Offset(w * 0.1f, 0f),
-            end = Offset(w * 0.5f, h),
-            strokeWidth = 18f
-        )
-
-        // Círculos de concentración
-        puntos.forEach { punto ->
-            val center = Offset(w * punto.x, h * punto.y)
-            val radius = 40f + (punto.cantidad * 2f).coerceAtMost(40f)
-
-            // Círculo exterior translúcido
-            drawCircle(
-                color = punto.color.copy(alpha = 0.25f),
-                radius = radius,
-                center = center
-            )
-            // Borde
-            drawCircle(
-                color = punto.color.copy(alpha = 0.5f),
-                radius = radius,
-                center = center,
-                style = Stroke(width = 4f)
-            )
-            // Círculo interior sólido con número
-            drawCircle(
-                color = punto.color,
-                radius = radius * 0.4f,
-                center = center
-            )
-        }
-
-        // Marcadores tipo pin (círculos azules con borde blanco)
-        marcadores.forEach { (x, y) ->
-            val center = Offset(w * x, h * y)
-            drawCircle(
-                color = Color.White,
-                radius = 18f,
-                center = center
-            )
-            drawCircle(
-                color = AzulOscuro,
-                radius = 13f,
-                center = center
-            )
-        }
-    }
-
-    // Capa de texto encima del Canvas (números de los círculos)
-    // Se hace aparte porque Canvas no dibuja texto fácilmente
-    Box(modifier = Modifier.fillMaxSize()) {
-        puntos.forEach { punto ->
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val w = maxWidth
-                val h = maxHeight
-                // Posicionar el texto en el centro del círculo
-                Text(
-                    text = punto.cantidad.toString(),
-                    color = TextoBlanco,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .offset(
-                            x = w * punto.x - 10.dp,
-                            y = h * punto.y - 10.dp
-                        )
-                )
             }
         }
     }

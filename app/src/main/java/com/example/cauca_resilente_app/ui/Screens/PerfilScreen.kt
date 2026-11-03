@@ -22,7 +22,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cauca_resilente_app.api.User
 import com.example.cauca_resilente_app.ui.theme.AzulOscuro
+import com.example.cauca_resilente_app.ui.theme.FondoClaro
 import com.example.cauca_resilente_app.ui.theme.RojoEmergencia
 import com.example.cauca_resilente_app.ui.theme.TextoBlanco
 import com.example.cauca_resilente_app.ui.theme.TextoOscuro
@@ -30,9 +32,7 @@ import com.example.cauca_resilente_app.ui.theme.TextoOscuro
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PerfilScreen(
-    nombre: String = "Juan Pérez",
-    correo: String = "juan.perez@email.com",
-    telefono: String = "+57 300 123 4567",
+    user: User?,
     onBackClick: () -> Unit,
     onMisContactosClick: () -> Unit,
     onConfiguracionClick: () -> Unit,
@@ -42,6 +42,14 @@ fun PerfilScreen(
     onNavItemSelected: (Int) -> Unit,
     onSosClick: () -> Unit
 ) {
+    val nombre = user?.nombreCompleto?.takeIf { it.isNotBlank() } ?: "Usuario"
+    val correo = user?.email?.takeIf { it.isNotBlank() } ?: "Sin correo"
+    val telefono = user?.phone?.takeIf { it.isNotBlank() } ?: "Sin teléfono"
+    val documento = listOfNotNull(user?.tipoDocumento, user?.identificacion)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+        .takeIf { it.isNotBlank() }
+
     Scaffold(
         containerColor = TextoBlanco,
         topBar = {
@@ -129,6 +137,47 @@ fun PerfilScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // ===== INFORMACIÓN PERSONAL =====
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = FondoClaro)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "INFORMACIÓN PERSONAL",
+                        fontSize = 11.sp,
+                        color = AzulOscuro,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    InfoPerfil("Nombre completo", user?.nombreCompleto)
+                    InfoPerfil("Documento", documento)
+                    InfoPerfil("Correo", user?.email)
+                    InfoPerfil("Teléfono", user?.phone)
+                    InfoPerfil("Ciudad", user?.ciudad)
+                    InfoPerfil("Dirección", user?.direccion)
+                    InfoPerfil("Género", user?.genero)
+                    InfoPerfil("Edad", user?.edad?.let { "$it años" })
+                    InfoPerfil("Tipo de sangre", user?.tipoSangre)
+                    InfoPerfil("Rol", user?.rol)
+                    InfoPerfil("Miembro desde", user?.fechaRegistro?.take(10))
+                    InfoPerfil(
+                        "Contacto de emergencia",
+                        user?.contactoEmergencia?.let { contacto ->
+                            listOfNotNull(contacto.nombre, contacto.telefono, contacto.parentesco)
+                                .filter { it.isNotBlank() }
+                                .joinToString(" · ")
+                                .takeIf { it.isNotBlank() }
+                        }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // ===== OPCIONES =====
             OpcionPerfil(
                 icono = Icons.Filled.Contacts,
@@ -162,6 +211,30 @@ fun PerfilScreen(
                 onClick = onCerrarSesionClick
             )
         }
+    }
+}
+
+@Composable
+private fun InfoPerfil(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            color = TextoOscuro.copy(alpha = 0.6f),
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            value,
+            fontSize = 13.sp,
+            color = TextoOscuro,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
