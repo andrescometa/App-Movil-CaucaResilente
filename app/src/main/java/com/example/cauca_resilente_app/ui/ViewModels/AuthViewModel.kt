@@ -17,11 +17,18 @@ data class AuthUiState(
     val confirmPassword: String = "",
     val nombre: String = "",
     val telefono: String = "",
+    val tipoDocumento: String = "CC",
+    val identificacion: String = "",
+    val ciudad: String = "",
+    val tipoSangre: String = "",
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isAuthenticated: Boolean = false,
-    val usuarioLogueado: String? = null
+    val usuarioLogueado: String? = null,
+    val entidad : String? = null
 )
+
+
 
 class AuthViewModel : ViewModel() {
 
@@ -49,9 +56,36 @@ class AuthViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(telefono = telefono, errorMessage = null)
     }
 
+    fun onTipoDocumentoChange(tipoDocumento: String) {
+        _uiState.value = _uiState.value.copy(tipoDocumento = tipoDocumento, errorMessage = null)
+    }
+
+    fun onIdentificacionChange(identificacion: String) {
+        _uiState.value = _uiState.value.copy(identificacion = identificacion, errorMessage = null)
+    }
+
+    fun onCiudadChange(ciudad: String) {
+        _uiState.value = _uiState.value.copy(ciudad = ciudad, errorMessage = null)
+    }
+
+    fun onTipoSangreChange(tipoSangre: String) {
+        _uiState.value = _uiState.value.copy(tipoSangre = tipoSangre, errorMessage = null)
+    }
+
+    fun onEntidadChange(entidad: String) {
+        _uiState.value = _uiState.value.copy(entidad = entidad, errorMessage = null)
+    }
+
     // ===== VALIDACIONES =====
     private fun esEmailValido(email: String): Boolean {
         return android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    }
+
+    private fun mensajeError(response: retrofit2.Response<*>): String? {
+        val cuerpo = response.errorBody()?.string() ?: return null
+        return runCatching {
+            org.json.JSONObject(cuerpo).optString("mensaje").takeIf { it.isNotBlank() }
+        }.getOrNull()
     }
 
     private fun validarLogin(): String? {
@@ -69,6 +103,26 @@ class AuthViewModel : ViewModel() {
         val state = _uiState.value
         return when {
             state.nombre.isBlank() -> "El nombre es obligatorio"
+            state.telefono.isBlank() -> "El teléfono es obligatorio"
+            state.telefono.length < 10 -> "El teléfono debe tener al menos 10 dígitos"
+            state.email.isBlank() -> "El correo electrónico es obligatorio"
+            !esEmailValido(state.email) -> "El correo electrónico no es válido"
+            state.password.isBlank() -> "La contraseña es obligatoria"
+            state.password.length < 6 -> "La contraseña debe tener al menos 6 caracteres"
+            state.password != state.confirmPassword -> "Las contraseñas no coinciden"
+            else -> null
+        }
+    }
+
+    private fun validarRegistroSocorrista(): String? {
+        val state = _uiState.value
+        return when {
+            state.nombre.isBlank() -> "El nombre es obligatorio"
+            state.tipoDocumento.isBlank() -> "El tipo de documento es obligatorio"
+            state.identificacion.isBlank() -> "La identificación es obligatoria"
+            state.identificacion.length < 6 -> "La identificación no es válida"
+            state.ciudad.isBlank() -> "La ciudad es obligatoria"
+            state.tipoSangre.isBlank() -> "El tipo de sangre es obligatorio"
             state.telefono.isBlank() -> "El teléfono es obligatorio"
             state.telefono.length < 10 -> "El teléfono debe tener al menos 10 dígitos"
             state.email.isBlank() -> "El correo electrónico es obligatorio"
@@ -124,17 +178,44 @@ class AuthViewModel : ViewModel() {
             return
         }
 
+        enviarRegistro(
+            com.example.cauca_resilente_app.api.RegisterRequest(
+                name = _uiState.value.nombre,
+                email = _uiState.value.email,
+                phone = _uiState.value.telefono,
+                password = _uiState.value.password,
+                rol = "usuario"
+            )
+        )
+    }
+
+    fun registrarSocorrista() {
+        val error = validarRegistroSocorrista()
+        if (error != null) {
+            _uiState.value = _uiState.value.copy(errorMessage = error)
+            return
+        }
+
+        enviarRegistro(
+            com.example.cauca_resilente_app.api.RegisterRequest(
+                name = _uiState.value.nombre,
+                email = _uiState.value.email,
+                phone = _uiState.value.telefono,
+                password = _uiState.value.password,
+                rol = "socorrista",
+                tipoDocumento = _uiState.value.tipoDocumento,
+                identificacion = _uiState.value.identificacion,
+                ciudad = _uiState.value.ciudad,
+                tipoSangre = _uiState.value.tipoSangre
+            )
+        )
+    }
+
+    private fun enviarRegistro(request: com.example.cauca_resilente_app.api.RegisterRequest) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val response = RetrofitInstance.apiService.register(
-                    com.example.cauca_resilente_app.api.RegisterRequest(
-                        name = _uiState.value.nombre,
-                        email = _uiState.value.email,
-                        phone = _uiState.value.telefono,
-                        password = _uiState.value.password
-                    )
-                )
+                val response = RetrofitInstance.apiService.register(request)
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     SessionManager.saveSession(body.token, body.user)
@@ -144,7 +225,8 @@ class AuthViewModel : ViewModel() {
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
-                        isLoading = false, errorMessage = "Error al registrarse"
+                        isLoading = false,
+                        errorMessage = mensajeError(response) ?: "Error al registrarse"
                     )
                 }
             } catch (e: Exception) {
@@ -163,4 +245,6 @@ class AuthViewModel : ViewModel() {
     fun resetEstado() {
         _uiState.value = AuthUiState()
     }
+
+
 }

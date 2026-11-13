@@ -79,7 +79,7 @@ class MainActivity : AppCompatActivity() {
 
 
                 // 6. Obtener mapa
-                val mapResp = RetrofitInstance.apiService.getMapPoints(token, "all")
+                val mapResp = RetrofitInstance.apiService.getMapPoints("all")
                 Log.d("API", "Puntos en mapa: ${mapResp.body()?.size}")
 
                 // 7. Obtener alertas

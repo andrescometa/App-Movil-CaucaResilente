@@ -1,6 +1,6 @@
 package com.example.cauca_resilente_app.ui.Navigation
 
-import SolicitarAyudaScreen
+import com.example.cauca_resilente_app.ui.Screens.SolicitarAyudaScreen
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,12 +23,15 @@ import com.example.cauca_resilente_app.ui.Screens.MiUbicacionScreen
 import com.example.cauca_resilente_app.ui.Screens.MisContactosScreen
 import com.example.cauca_resilente_app.ui.Screens.PerfilScreen
 import com.example.cauca_resilente_app.ui.Screens.RegistroScreen
+import com.example.cauca_resilente_app.ui.Screens.RegistroSocorristaScreen
+import com.example.cauca_resilente_app.ui.Screens.SolicitudesAsignadasScreen
 import com.example.cauca_resilente_app.ui.ViewModels.AlertasViewModel
 
 import com.example.cauca_resilente_app.ui.ViewModels.AuthViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.ContactosViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.EstadoViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.SolicitarAyudaViewModel
+import com.example.cauca_resilente_app.ui.ViewModels.SolicitudesAsignadasViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.UserViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.ViewModelFactory
 
@@ -42,6 +45,8 @@ fun AppNavigation() {
     val api = remember { RetrofitInstance.apiService }
     val estadoViewModel: EstadoViewModel = viewModel(factory = ViewModelFactory(api))
     val estadoUiState by estadoViewModel.uiState.collectAsStateWithLifecycle()
+    val contactosViewModel: ContactosViewModel = viewModel(factory = ViewModelFactory(api))
+    val contactosUiState by contactosViewModel.uiState.collectAsStateWithLifecycle()
     val sesionExpirada by userViewModel.sessionExpired.collectAsStateWithLifecycle()
     val nombreMostrar = SessionManager.getUser()?.nombreCompleto?.takeIf { it.isNotBlank() } ?: "Usuario"
     val navController = rememberNavController()
@@ -93,6 +98,7 @@ fun AppNavigation() {
 
                 },
                 onRegisterClick = {navController.navigate(Screen.Registro.route) },
+                onRegistroSocorristaClick = { navController.navigate(Screen.RegistroSocorrista.route) },
                 onForgotPasswordClick = { /* TODO recuperación */ },
                 viewModel = authViewModel
 
@@ -115,62 +121,106 @@ fun AppNavigation() {
                     onYaTengoCuentaClick = {
                         navController.popBackStack()
                     },
+                    onRegistroSocorristaClick = {
+                        navController.navigate(Screen.RegistroSocorrista.route) {
+                            popUpTo(Screen.Registro.route) { inclusive = true }
+                        }
+                    },
                     viewModel = authViewModel
                 )
             }
 
-
+        // composable para el registro de socorristas
+        composable(Screen.RegistroSocorrista.route) {
+            RegistroSocorristaScreen(
+                onBackClick = { navController.popBackStack() },
+                onYaTengoCuentaClick = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.RegistroSocorrista.route) { inclusive = true }
+                    }
+                },
+                onRegistroUsuarioClick = {
+                    navController.navigate(Screen.Registro.route) {
+                        popUpTo(Screen.RegistroSocorrista.route) { inclusive = true }
+                    }
+                },
+                viewModel = authViewModel
+            )
+        }
 
 
         // composable para la ruta de Home
         composable(Screen.Home.route) {
-            val user = SessionManager.getUser()
+            val user = SessionManager.getUser() ?: usuario
+            val socorrista = user?.esSocorrista == true
+
+            LaunchedEffect(Unit) {
+                contactosViewModel.cargarContactos()
+            }
+
             HomeScreen(
                 user = user,
                 estadoActual = estadoUiState.estadoActual,
-                onNotificacionesClick = { /* TODO */ },
+                contactos = contactosUiState.contactos,
+                esSocorrista = socorrista,
+                onSolicitudesAsignadasClick = {
+                    navController.navigate(Screen.SolicitudesAsignadas.route)
+                },
+                onNotificacionesClick = { navController.navigate(Screen.Alertas.route) },
                 onMiEstadoClick = { navController.navigate(Screen.MiEstado.route) },
-                onSolicitarAyudaClick = { navController.navigate(Screen.SolicitarAyuda.route)},
+                onSolicitarAyudaClick = { navController.navigate(Screen.SolicitarAyuda.route) },
                 onMiUbicacionClick = { navController.navigate(Screen.MiUbicacion.route) },
-                onInformacionClick = { navController.navigate(Screen.Informacion.route)},
+                onInformacionClick = { navController.navigate(Screen.Informacion.route) },
                 onVerEnMapaClick = { navController.navigate(Screen.Mapa.route) },
+                onCirculoProtectorClick = { navController.navigate(Screen.MisContactos.route) },
                 onNavItemSelected = { index ->
                     when (index) {
                         1 -> navController.navigate(Screen.Mapa.route)
-                        3 -> navController.navigate(Screen.Alertas.route)
+                        2 -> navController.navigate(Screen.MisContactos.route)
                         4 -> navController.navigate(Screen.Perfil.route)
                     }
                 },
-                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route)}
+                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
             )
         }
 
         // composable para la ruta de Mi Estado
-
         composable (Screen.MiEstado.route){
             MiEstadoScreen(
                 onBackClick = { navController.popBackStack() },
                 viewModel = estadoViewModel
-
             )
         }
 
         // composable para la ruta de solicitar ayuda
-
         composable (Screen.SolicitarAyuda.route){
             val viewModel: SolicitarAyudaViewModel = viewModel(factory = ViewModelFactory(api))
             LaunchedEffect(Unit) {
                 viewModel.resetEstado()
-
             }
 
             SolicitarAyudaScreen(
                 onBackClick = { navController.popBackStack() },
                 onSolicitudEnviada = {
                     navController.popBackStack()
-
-
                 },
+                viewModel = viewModel,
+                onNavItemSelected = { index ->
+                    when (index) {
+                        0 -> navController.navigate(Screen.Home.route)
+                        2 -> navController.navigate(Screen.MisContactos.route)
+                        4 -> navController.navigate(Screen.Perfil.route)
+                    }
+                },
+                onSosClick = { }
+            )
+        }
+
+        // composable para las solicitudes asignadas al socorrista
+        composable(Screen.SolicitudesAsignadas.route) {
+            val viewModel: SolicitudesAsignadasViewModel = viewModel(factory = ViewModelFactory(api))
+            SolicitudesAsignadasScreen(
+                onBackClick = { navController.popBackStack() },
                 viewModel = viewModel
             )
         }
@@ -183,7 +233,16 @@ fun AppNavigation() {
                     onBackClick = { navController.popBackStack() },
                     onVerMasClick = { /* TODO: detalle */ },
                     viewModel = viewModel,
-                    tabInicial = 0
+                    tabInicial = 0,
+                    onNavItemSelected = { index ->
+                        when (index) {
+                            0 -> navController.navigate(Screen.Home.route)
+                            1 -> navController.navigate(Screen.Mapa.route)
+                            2 -> navController.navigate(Screen.MisContactos.route)
+                            4 -> navController.navigate(Screen.Perfil.route)
+                        }
+                    },
+                    onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
                 )
             }
 
@@ -194,7 +253,16 @@ fun AppNavigation() {
                     onBackClick = { navController.navigate(Screen.Home.route) { popUpTo(0) { inclusive = true } } },
                     onVerMasClick = { /* TODO: detalle */ },
                     viewModel = viewModel,
-                    tabInicial = 1
+                    tabInicial = 1,
+                    onNavItemSelected = { index ->
+                        when (index) {
+                            0 -> navController.navigate(Screen.Home.route)
+                            1 -> navController.navigate(Screen.Mapa.route)
+                            2 -> navController.navigate(Screen.MisContactos.route)
+                            4 -> navController.navigate(Screen.Perfil.route)
+                        }
+                    },
+                    onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
                 )
             }
 
@@ -218,10 +286,10 @@ fun AppNavigation() {
                     when (index) {
                         0 -> navController.navigate(Screen.Home.route)
                         1 -> navController.navigate(Screen.Mapa.route)
-                        3 -> navController.navigate(Screen.Alertas.route)
+                        2 -> navController.navigate(Screen.MisContactos.route)
                     }
                 },
-                onSosClick = { /* TODO */ }
+                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
             )
         }
 
@@ -244,7 +312,15 @@ fun AppNavigation() {
                 onBackClick = { navController.popBackStack() },
                 onVerEnMapaClick = { navController.navigate(Screen.Mapa.route) },
                 onVerHistorialCompletoClick = { /* TODO: pantalla de historial completo */ },
-                viewModel = ubicacionViewModel
+                viewModel = ubicacionViewModel,
+                onNavItemSelected = { index ->
+                    when (index) {
+                        0 -> navController.navigate(Screen.Home.route)
+                        2 -> navController.navigate(Screen.MisContactos.route)
+                        4 -> navController.navigate(Screen.Perfil.route)
+                    }
+                },
+                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
             )
         }
 
@@ -258,7 +334,7 @@ fun AppNavigation() {
                 onNavItemSelected = { index ->
                     when (index) {
                         0 -> navController.navigate(Screen.Home.route)
-                        3 -> navController.navigate(Screen.Alertas.route)
+                        2 -> navController.navigate(Screen.MisContactos.route)
                         4 -> navController.navigate(Screen.Perfil.route)
                     }
                 },

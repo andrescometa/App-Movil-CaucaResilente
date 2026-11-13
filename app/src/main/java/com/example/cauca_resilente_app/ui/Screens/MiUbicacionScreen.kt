@@ -4,52 +4,84 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.cauca_resilente_app.location.obtenerDireccion
 import com.example.cauca_resilente_app.location.obtenerUbicacionActual
 import com.example.cauca_resilente_app.location.tienePermisoUbicacion
 import com.example.cauca_resilente_app.ui.ViewModels.RegistroUbicacion
 import com.example.cauca_resilente_app.ui.ViewModels.UbicacionViewModel
-import com.example.cauca_resilente_app.ui.components.MapaLibreView
+import com.example.cauca_resilente_app.ui.components.AppCard
+import com.example.cauca_resilente_app.ui.components.AppChip
+import com.example.cauca_resilente_app.ui.components.AppPrimaryButton
+import com.example.cauca_resilente_app.ui.components.AppScreenHeader
+import com.example.cauca_resilente_app.ui.components.MapaGoogleView
 import com.example.cauca_resilente_app.ui.components.PuntoMapa
+import com.example.cauca_resilente_app.ui.components.StatusDot
 import com.example.cauca_resilente_app.ui.components.TipoPuntoMapa
-import com.example.cauca_resilente_app.ui.theme.AzulInstitucional
-import com.example.cauca_resilente_app.ui.theme.AzulOscuro
-import com.example.cauca_resilente_app.ui.theme.FondoClaro
-import com.example.cauca_resilente_app.ui.theme.TextoBlanco
-import com.example.cauca_resilente_app.ui.theme.TextoOscuro
-import org.maplibre.android.geometry.LatLng
+import com.example.cauca_resilente_app.ui.theme.AppDesign
+import com.example.cauca_resilente_app.ui.theme.appTypography
+import com.google.android.gms.maps.model.LatLng
 
 private const val LATITUD_POR_DEFECTO = 2.4448
 private const val LONGITUD_POR_DEFECTO = -76.6147
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiUbicacionScreen(
     onBackClick: () -> Unit,
     onVerEnMapaClick: () -> Unit,
     onVerHistorialCompletoClick: () -> Unit,
-    viewModel: UbicacionViewModel
+    viewModel: UbicacionViewModel,
+    onNavItemSelected: (Int) -> Unit = {},
+    onSosClick: () -> Unit = {}
 ) {
+    val type = appTypography
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -95,33 +127,13 @@ fun MiUbicacionScreen(
     }
 
     Scaffold(
-        containerColor = TextoBlanco,
+        containerColor = AppDesign.Background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Mi ubicación",
-                        color = TextoBlanco,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = TextoBlanco
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.cargarHistorial() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Recargar historial", tint = TextoBlanco)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AzulOscuro)
+        bottomBar = {
+            BottomNavBar(
+                selectedItem = 1,
+                onItemSelected = onNavItemSelected,
+                onSosClick = onSosClick
             )
         }
     ) { padding ->
@@ -129,140 +141,243 @@ fun MiUbicacionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 20.dp)
+                .statusBarsPadding()
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = FondoClaro)
+            AppScreenHeader(
+                title = "Mi ubicación",
+                subtitle = "UniAutónoma Segura • En vivo",
+                onBack = onBackClick,
+                actionIcon = Icons.Filled.Share,
+                onAction = { viewModel.cargarHistorial() },
+                actionBackground = AppDesign.SoftBg,
+                actionTint = AppDesign.TextSoft
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Última ubicación registrada",
-                            fontSize = 12.sp,
-                            color = TextoOscuro.copy(alpha = 0.6f),
+                Spacer(modifier = Modifier.height(4.dp))
+
+                AppCard(padding = 16.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppChip(
+                            text = "Última ubicación",
+                            color = AppDesign.WarningDark,
+                            background = AppDesign.WarningSoft,
+                            dotColor = AppDesign.Warning,
                             modifier = Modifier.weight(1f)
                         )
                         if (uiState.guardando) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = AzulOscuro,
+                                modifier = Modifier.size(14.dp),
+                                color = AppDesign.Primary,
                                 strokeWidth = 2.dp
+                            )
+                        } else {
+                            AppChip(
+                                text = "Precisión GPS",
+                                color = AppDesign.SuccessDark,
+                                background = AppDesign.SuccessSoft,
+                                dotColor = AppDesign.Success
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         uiState.direccionActual,
-                        fontSize = 17.sp,
+                        color = AppDesign.Heading,
+                        fontSize = type.title,
                         fontWeight = FontWeight.Bold,
-                        color = TextoOscuro
+                        lineHeight = type.titleLineHeight
                     )
-                    if (uiState.fechaActual.isNotBlank()) {
-                        Text(
-                            uiState.fechaActual,
-                            fontSize = 12.sp,
-                            color = TextoOscuro.copy(alpha = 0.6f)
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Filled.AccessTime,
+                            contentDescription = null,
+                            tint = AppDesign.TextMuted,
+                            modifier = Modifier.size(14.dp)
                         )
-                    }
-                    val latitudActual = uiState.latitudActual
-                    val longitudActual = uiState.longitudActual
-                    if (latitudActual != null && longitudActual != null) {
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            String.format(
-                                java.util.Locale.getDefault(),
-                                "Lat %.5f • Lng %.5f",
-                                latitudActual,
-                                longitudActual
-                            ),
-                            fontSize = 12.sp,
-                            color = TextoOscuro.copy(alpha = 0.6f)
+                            uiState.fechaActual.ifBlank { "Calculando..." },
+                            color = AppDesign.TextMuted,
+                            fontSize = type.caption,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text("  •  ", color = AppDesign.TextMuted, fontSize = type.caption)
+                        Text(
+                            "Sector Histórico",
+                            color = AppDesign.Primary,
+                            fontSize = type.caption,
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    MapaPreview(
-                        latitud = uiState.latitudActual,
-                        longitud = uiState.longitudActual,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(160.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedButton(
-                        onClick = onVerEnMapaClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = AzulOscuro)
-                    ) {
-                        Icon(Icons.Filled.Map, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Ver en el mapa", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                "Historial de ubicaciones",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextoOscuro
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            when {
-                uiState.isLoading && uiState.historial.isEmpty() -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        contentAlignment = Alignment.Center
+                            .height(176.dp)
+                            .clip(RoundedCornerShape(AppDesign.CardRadius))
+                            .border(1.dp, AppDesign.Border, RoundedCornerShape(AppDesign.CardRadius))
                     ) {
-                        CircularProgressIndicator(color = AzulOscuro)
+                        MapaPreview(
+                            latitud = uiState.latitudActual,
+                            longitud = uiState.longitudActual,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .size(30.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(AppDesign.Surface)
+                                .border(1.dp, AppDesign.Border, RoundedCornerShape(9.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.MyLocation,
+                                contentDescription = null,
+                                tint = AppDesign.Primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(8.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(AppDesign.Surface)
+                                .border(1.dp, AppDesign.Border, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            StatusDot(AppDesign.Primary, pulsing = false, size = 6.dp)
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                "Campus La Casona (350 m)",
+                                color = AppDesign.TextSoft,
+                                fontSize = type.micro,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
-                }
 
-                uiState.historial.isEmpty() -> {
-                    Text(
-                        "Todavía no hay ubicaciones registradas.",
-                        fontSize = 14.sp,
-                        color = TextoOscuro.copy(alpha = 0.6f)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    AppPrimaryButton(
+                        text = "Ver en el mapa",
+                        icon = Icons.Filled.Map,
+                        onClick = onVerEnMapaClick
                     )
                 }
 
-                else -> {
-                    uiState.historial.forEach { registro ->
-                        FilaHistorial(registro)
-                        Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(22.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Historial de ubicaciones",
+                        color = AppDesign.Heading,
+                        fontSize = type.sectionTitle,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AppChip(
+                        text = "Hoy",
+                        color = AppDesign.Primary,
+                        background = AppDesign.PrimarySoft
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(
+                        Icons.Filled.Sync,
+                        contentDescription = null,
+                        tint = AppDesign.TextMuted,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "Sincronizado",
+                        color = AppDesign.TextMuted,
+                        fontSize = type.micro,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                when {
+                    uiState.isLoading && uiState.historial.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = AppDesign.Primary)
+                        }
+                    }
+                    uiState.historial.isEmpty() -> {
+                        AppCard(padding = 16.dp) {
+                            Text(
+                                "Todavía no hay ubicaciones registradas.",
+                                color = AppDesign.TextMuted,
+                                fontSize = type.bodySmall,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    else -> {
+                        AppCard(padding = 16.dp) {
+                            uiState.historial.forEachIndexed { index, registro ->
+                                FilaHistorial(registro, index == 0)
+                                if (index != uiState.historial.lastIndex) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .background(AppDesign.Border)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            TextButton(
-                onClick = onVerHistorialCompletoClick,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            ) {
-                Text(
-                    "Ver historial completo",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AzulInstitucional
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onVerHistorialCompletoClick() }
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Ver historial completo",
+                        color = AppDesign.Primary,
+                        fontSize = type.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = AppDesign.Primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -277,7 +392,7 @@ private fun MapaPreview(
     val lat = latitud ?: LATITUD_POR_DEFECTO
     val lng = longitud ?: LONGITUD_POR_DEFECTO
 
-    MapaLibreView(
+    MapaGoogleView(
         puntos = listOf(
             PuntoMapa(
                 latitud = lat,
@@ -291,42 +406,69 @@ private fun MapaPreview(
         zoomInicial = 16.0,
         interactivo = false,
         actualizarCentroConDatos = true,
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFE8F0E3))
+        modifier = modifier.background(Color(0xFFE8F0E3))
     )
 }
 
 @Composable
-private fun FilaHistorial(registro: RegistroUbicacion) {
+private fun FilaHistorial(registro: RegistroUbicacion, actual: Boolean) {
+    val type = appTypography
+    val colorFondo = if (actual) AppDesign.PrimarySoft else AppDesign.SoftBg
+    val colorIcono = if (actual) AppDesign.Primary else AppDesign.WarningDark
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(FondoClaro, RoundedCornerShape(12.dp))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { }
+            .padding(vertical = 10.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            Icons.Filled.LocationOn,
-            contentDescription = null,
-            tint = AzulOscuro,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(10.dp))
-        Column {
-            Text(
-                registro.direccion,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = TextoOscuro
-            )
-            Text(
-                listOf(registro.hora, registro.fecha)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" • "),
-                fontSize = 12.sp,
-                color = TextoOscuro.copy(alpha = 0.6f)
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(colorFondo),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (actual) Icons.Filled.LocationOn else Icons.Filled.Business,
+                contentDescription = null,
+                tint = colorIcono,
+                modifier = Modifier.size(18.dp)
             )
         }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    registro.hora.ifBlank { registro.fecha },
+                    color = AppDesign.TextMuted,
+                    fontSize = type.caption,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                AppChip(
+                    text = if (actual) "Parada actual" else "En tránsito",
+                    color = if (actual) AppDesign.SuccessDark else AppDesign.WarningDark,
+                    background = if (actual) AppDesign.SuccessSoft else AppDesign.WarningSoft
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                registro.direccion,
+                color = AppDesign.Heading,
+                fontSize = type.bodySmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            Icons.Filled.ChevronRight,
+            contentDescription = null,
+            tint = AppDesign.TextMuted,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }

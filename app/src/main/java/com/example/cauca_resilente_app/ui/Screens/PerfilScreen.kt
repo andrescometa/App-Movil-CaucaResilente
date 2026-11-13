@@ -1,35 +1,55 @@
 package com.example.cauca_resilente_app.ui.Screens
 
-// ui/screens/PerfilScreen.kt
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.cauca_resilente_app.api.User
-import com.example.cauca_resilente_app.ui.theme.AzulOscuro
-import com.example.cauca_resilente_app.ui.theme.FondoClaro
-import com.example.cauca_resilente_app.ui.theme.RojoEmergencia
-import com.example.cauca_resilente_app.ui.theme.TextoBlanco
-import com.example.cauca_resilente_app.ui.theme.TextoOscuro
+import com.example.cauca_resilente_app.ui.components.AppCard
+import com.example.cauca_resilente_app.ui.components.AppChip
+import com.example.cauca_resilente_app.ui.components.AppIconTile
+import com.example.cauca_resilente_app.ui.components.AppScreenHeader
+import com.example.cauca_resilente_app.ui.components.AppSectionHeader
+import com.example.cauca_resilente_app.ui.theme.AppDesign
+import com.example.cauca_resilente_app.ui.theme.appTypography
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PerfilScreen(
     user: User?,
@@ -40,45 +60,26 @@ fun PerfilScreen(
     onAcercaDeClick: () -> Unit,
     onCerrarSesionClick: () -> Unit,
     onNavItemSelected: (Int) -> Unit,
-    onSosClick: () -> Unit
+    onSosClick: () -> Unit,
+    mostrarSos: Boolean = true
 ) {
+    val type = appTypography
     val nombre = user?.nombreCompleto?.takeIf { it.isNotBlank() } ?: "Usuario"
     val correo = user?.email?.takeIf { it.isNotBlank() } ?: "Sin correo"
     val telefono = user?.phone?.takeIf { it.isNotBlank() } ?: "Sin teléfono"
-    val documento = listOfNotNull(user?.tipoDocumento, user?.identificacion)
-        .filter { it.isNotBlank() }
-        .joinToString(" ")
-        .takeIf { it.isNotBlank() }
+    val iniciales = nombre.trim().split(" ").filter { it.isNotBlank() }.take(2)
+        .joinToString("") { it.first().uppercase() }.ifBlank { "UA" }
+    val carrera = user?.rol?.takeIf { it.isNotBlank() }?.replaceFirstChar { it.uppercase() } ?: "Comunidad UA"
+    val contactosActivos = if (user?.contactoEmergencia != null) "1 activo" else "0 activos"
 
     Scaffold(
-        containerColor = TextoBlanco,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Perfil",
-                        color = TextoBlanco,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Volver",
-                            tint = TextoBlanco
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AzulOscuro)
-            )
-        },
+        containerColor = AppDesign.Background,
         bottomBar = {
             BottomNavBar(
                 selectedItem = 4,
                 onItemSelected = onNavItemSelected,
-                onSosClick = onSosClick
+                onSosClick = onSosClick,
+                mostrarSos = mostrarSos
             )
         }
     ) { padding ->
@@ -86,154 +87,277 @@ fun PerfilScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
         ) {
-            // ===== CABECERA CON AVATAR =====
-            Row(
+            AppScreenHeader(
+                title = "Perfil",
+                subtitle = "UniAutónoma Segura",
+                onBack = onBackClick,
+                actionIcon = Icons.Filled.QrCode2,
+                onAction = { },
+                actionBackground = AppDesign.PrimarySoft,
+                actionTint = AppDesign.Primary
+            )
+
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
             ) {
-                // Avatar circular
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .background(AzulOscuro.copy(alpha = 0.1f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Filled.Person,
-                        contentDescription = "Avatar",
-                        tint = AzulOscuro,
-                        modifier = Modifier.size(40.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
 
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Text(
-                        nombre,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextoOscuro
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        correo,
-                        fontSize = 13.sp,
-                        color = TextoOscuro.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        telefono,
-                        fontSize = 13.sp,
-                        color = TextoOscuro.copy(alpha = 0.6f)
-                    )
-                }
-            }
-
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ===== INFORMACIÓN PERSONAL =====
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = FondoClaro)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "INFORMACIÓN PERSONAL",
-                        fontSize = 11.sp,
-                        color = AzulOscuro,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    InfoPerfil("Nombre completo", user?.nombreCompleto)
-                    InfoPerfil("Documento", documento)
-                    InfoPerfil("Correo", user?.email)
-                    InfoPerfil("Teléfono", user?.phone)
-                    InfoPerfil("Ciudad", user?.ciudad)
-                    InfoPerfil("Dirección", user?.direccion)
-                    InfoPerfil("Género", user?.genero)
-                    InfoPerfil("Edad", user?.edad?.let { "$it años" })
-                    InfoPerfil("Tipo de sangre", user?.tipoSangre)
-                    InfoPerfil("Rol", user?.rol)
-                    InfoPerfil("Miembro desde", user?.fechaRegistro?.take(10))
-                    InfoPerfil(
-                        "Contacto de emergencia",
-                        user?.contactoEmergencia?.let { contacto ->
-                            listOfNotNull(contacto.nombre, contacto.telefono, contacto.parentesco)
-                                .filter { it.isNotBlank() }
-                                .joinToString(" · ")
-                                .takeIf { it.isNotBlank() }
+                // ===== TARJETA DE PERFIL =====
+                AppCard(padding = 16.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(contentAlignment = Alignment.BottomEnd) {
+                            Box(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(RoundedCornerShape(AppDesign.TileRadius + 6.dp))
+                                    .background(AppDesign.PrimarySoft)
+                                    .border(1.dp, AppDesign.PrimaryBorder, RoundedCornerShape(AppDesign.TileRadius + 6.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = iniciales,
+                                    color = AppDesign.Primary,
+                                    fontSize = type.title,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(AppDesign.Success)
+                                    .border(2.dp, AppDesign.Surface, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
                         }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    nombre,
+                                    color = AppDesign.Heading,
+                                    fontSize = type.label,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                AppChip(
+                                    text = "UA",
+                                    color = AppDesign.Primary,
+                                    background = AppDesign.PrimarySoft
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                correo,
+                                color = AppDesign.TextGray,
+                                fontSize = type.caption,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                telefono,
+                                color = AppDesign.TextSoft,
+                                fontSize = type.caption,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AppChip(
+                                    text = carrera,
+                                    color = AppDesign.TextSoft,
+                                    background = AppDesign.SoftBg
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    Icons.Filled.LocationOn,
+                                    contentDescription = null,
+                                    tint = AppDesign.TextMuted,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    "Campus La Casona",
+                                    color = AppDesign.TextMuted,
+                                    fontSize = type.micro,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(AppDesign.Border)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MiniStat(
+                            "Contactos",
+                            contactosActivos,
+                            AppDesign.Surface,
+                            AppDesign.Heading,
+                            Modifier.weight(1f)
+                        )
+                        MiniStat(
+                            "GPS 100%",
+                            "Monitoreado",
+                            AppDesign.SuccessSoft,
+                            AppDesign.SuccessDark,
+                            Modifier.weight(1f)
+                        )
+                        MiniStat(
+                            "Estado",
+                            "Protegido",
+                            AppDesign.PrimarySoft,
+                            AppDesign.Primary,
+                            Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                AppSectionHeader(title = "Gestión y preferencias")
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OpcionPerfil(
+                    icono = Icons.Filled.Groups,
+                    titulo = "Mis contactos de emergencia",
+                    subtitulo = "Gestionar y notificar en caso de SOS",
+                    tint = AppDesign.SuccessDark,
+                    fondo = AppDesign.SuccessSoft,
+                    onClick = onMisContactosClick
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OpcionPerfil(
+                    icono = Icons.Filled.Settings,
+                    titulo = "Configuración y preferencias",
+                    subtitulo = "Alertas, tono de alarma y vibración",
+                    tint = AppDesign.WarningDark,
+                    fondo = AppDesign.WarningSoft,
+                    onClick = onConfiguracionClick
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OpcionPerfil(
+                    icono = Icons.Filled.Shield,
+                    titulo = "Privacidad y permisos",
+                    subtitulo = "Ubicación en 2do plano y telemetría",
+                    tint = AppDesign.Primary,
+                    fondo = AppDesign.PrimarySoft,
+                    onClick = onPrivacidadClick
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                OpcionPerfil(
+                    icono = Icons.Filled.Info,
+                    titulo = "Acerca de la app y Soporte UA",
+                    subtitulo = "Versión 2.4.0 • UniAutónoma del Cauca",
+                    tint = AppDesign.TextSoft,
+                    fondo = AppDesign.SoftBg,
+                    onClick = onAcercaDeClick
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Cerrar sesión
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(AppDesign.CardRadius))
+                        .background(AppDesign.DangerSoft)
+                        .border(1.dp, AppDesign.DangerBorder, RoundedCornerShape(AppDesign.CardRadius))
+                        .clickable { onCerrarSesionClick() }
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AppIconTile(
+                        icon = Icons.AutoMirrored.Filled.ExitToApp,
+                        tint = AppDesign.Danger,
+                        background = AppDesign.Surface,
+                        size = 44.dp,
+                        iconSize = 20.dp,
+                        shape = RoundedCornerShape(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Cerrar sesión",
+                            color = AppDesign.DangerDark,
+                            fontSize = type.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Finalizar sesión en este dispositivo",
+                            color = AppDesign.Danger,
+                            fontSize = type.caption,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = AppDesign.Danger,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
+
+                Spacer(modifier = Modifier.height(20.dp))
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ===== OPCIONES =====
-            OpcionPerfil(
-                icono = Icons.Filled.Contacts,
-                titulo = "Mis contactos de emergencia",
-                onClick = onMisContactosClick
-            )
-            OpcionPerfil(
-                icono = Icons.Filled.Settings,
-                titulo = "Configuración",
-                onClick = onConfiguracionClick
-            )
-            OpcionPerfil(
-                icono = Icons.Filled.Lock,
-                titulo = "Privacidad y permisos",
-                onClick = onPrivacidadClick
-            )
-            OpcionPerfil(
-                icono = Icons.Filled.Info,
-                titulo = "Acerca de la app",
-                onClick = onAcercaDeClick
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Cerrar sesión (rojo)
-            OpcionPerfil(
-                icono = Icons.AutoMirrored.Filled.ExitToApp,
-                titulo = "Cerrar sesión",
-                colorTexto = RojoEmergencia,
-                colorIcono = RojoEmergencia,
-                onClick = onCerrarSesionClick
-            )
         }
     }
 }
 
 @Composable
-private fun InfoPerfil(label: String, value: String?) {
-    if (value.isNullOrBlank()) return
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun MiniStat(
+    label: String,
+    value: String,
+    bg: Color,
+    valueColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val type = appTypography
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .border(1.dp, AppDesign.Border, RoundedCornerShape(12.dp))
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            label,
-            fontSize = 12.sp,
-            color = TextoOscuro.copy(alpha = 0.6f),
-            modifier = Modifier.weight(1f)
+            label.uppercase(),
+            color = AppDesign.TextMuted,
+            fontSize = type.micro,
+            fontWeight = FontWeight.Bold
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             value,
-            fontSize = 13.sp,
-            color = TextoOscuro,
-            fontWeight = FontWeight.Medium
+            color = valueColor,
+            fontSize = type.caption,
+            fontWeight = FontWeight.Bold
         )
     }
 }
@@ -242,35 +366,51 @@ private fun InfoPerfil(label: String, value: String?) {
 private fun OpcionPerfil(
     icono: ImageVector,
     titulo: String,
-    colorTexto: Color = TextoOscuro,
-    colorIcono: Color = AzulOscuro,
+    subtitulo: String,
+    tint: Color,
+    fondo: Color,
     onClick: () -> Unit
 ) {
+    val type = appTypography
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(AppDesign.CardRadius))
+            .background(AppDesign.Surface)
+            .border(1.dp, AppDesign.Border, RoundedCornerShape(AppDesign.CardRadius))
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+            .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            icono,
-            contentDescription = null,
-            tint = colorIcono,
-            modifier = Modifier.size(24.dp)
+        AppIconTile(
+            icon = icono,
+            tint = tint,
+            background = fondo,
+            size = 44.dp,
+            iconSize = 22.dp,
+            shape = RoundedCornerShape(13.dp)
         )
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            titulo,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = colorTexto,
-            modifier = Modifier.weight(1f)
-        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                titulo,
+                color = AppDesign.Heading,
+                fontSize = type.bodySmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                subtitulo,
+                color = AppDesign.TextGray,
+                fontSize = type.caption,
+                fontWeight = FontWeight.Medium,
+                lineHeight = type.captionLineHeight
+            )
+        }
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
-            tint = TextoOscuro.copy(alpha = 0.3f)
+            tint = AppDesign.TextMuted,
+            modifier = Modifier.size(18.dp)
         )
     }
 }

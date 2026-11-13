@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 
 enum class FiltroMapa(val titulo: String) {
     TODOS("Todos"),
@@ -50,37 +51,47 @@ class MapaViewModel(private val api: CaucaResilienteApiService) : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
 
+            // El usuario común no debe ver las solicitudes de ayuda de otras
+            // personas; su mapa solo muestra zonas y contactos de emergencia.
+            val esSocorrista = SessionManager.getUser()?.esSocorrista == true
+
             try {
-                val zonasDeferred = async { api.getZonasRiesgo() }
-                val solicitudesDeferred = async { api.getSolicitudesMapa() }
-                val usuariosDeferred = async {
-                    api.getMapPoints(SessionManager.getToken().orEmpty())
+                supervisorScope {
+                    val zonasDeferred = async { api.getZonasRiesgo() }
+                    val usuariosDeferred = async {
+                        api.getMapPoints()
+                    }
+                    val solicitudesDeferred = if (esSocorrista) {
+                        async { api.getSolicitudesMapa() }
+                    } else {
+                        null
+                    }
+
+                    val zonasResp = zonasDeferred.await()
+                    val usuariosResp = usuariosDeferred.await()
+                    val solicitudesResp = solicitudesDeferred?.await()
+
+                    val falloSolicitudes = solicitudesResp != null && !solicitudesResp.isSuccessful
+                    if (!zonasResp.isSuccessful || !usuariosResp.isSuccessful || falloSolicitudes) {
+                        val errores = listOfNotNull(
+                            if (!zonasResp.isSuccessful) "zonas (${zonasResp.code()})" else null,
+                            if (!usuariosResp.isSuccessful) "usuarios (${usuariosResp.code()})" else null,
+                            if (falloSolicitudes) "solicitudes (${solicitudesResp?.code()})" else null
+                        ).joinToString(", ")
+
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            errorMessage = "No se pudieron cargar los datos del mapa: $errores"
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            zonas = zonasResp.body()?.zonas.orEmpty(),
+                            solicitudes = solicitudesResp?.body()?.solicitudes.orEmpty(),
+                            usuarios = usuariosResp.body().orEmpty()
+                        )
+                    }
                 }
-
-                val zonasResp = zonasDeferred.await()
-                val solicitudesResp = solicitudesDeferred.await()
-                val usuariosResp = usuariosDeferred.await()
-
-                if (!zonasResp.isSuccessful || !solicitudesResp.isSuccessful || !usuariosResp.isSuccessful) {
-                    val errores = listOfNotNull(
-                        if (!zonasResp.isSuccessful) "zonas (${zonasResp.code()})" else null,
-                        if (!solicitudesResp.isSuccessful) "solicitudes (${solicitudesResp.code()})" else null,
-                        if (!usuariosResp.isSuccessful) "usuarios (${usuariosResp.code()})" else null
-                    ).joinToString(", ")
-
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "No se pudieron cargar los datos del mapa: $errores"
-                    )
-                    return@launch
-                }
-
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    zonas = zonasResp.body()?.zonas.orEmpty(),
-                    solicitudes = solicitudesResp.body()?.solicitudes.orEmpty(),
-                    usuarios = usuariosResp.body().orEmpty()
-                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

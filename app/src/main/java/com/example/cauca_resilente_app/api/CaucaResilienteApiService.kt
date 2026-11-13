@@ -37,7 +37,6 @@ interface CaucaResilienteApiService {
     // Mapa
     @GET("api/map/points")
     suspend fun getMapPoints(
-        @Header("Authorization") token: String,
         @Query("filter") filter: String = "all"
     ): Response<List<MapPoint>>
 
@@ -60,6 +59,12 @@ interface CaucaResilienteApiService {
 
     @GET("api/solicitud")
     suspend fun getSolicitudesMapa(): Response<SolicitudesMapaResponse>
+
+    // ===== SOLICITUDES ASIGNADAS AL SOCORRISTA =====
+    @GET("api/asignaciones/socorrista/{socorristaId}")
+    suspend fun getAsignacionesSocorrista(
+        @Path("socorristaId") socorristaId: String
+    ): Response<AsignacionesResponse>
 
     // ===== CONTACTOS DE EMERGENCIA =====
     @GET("api/contactos/{usuarioId}")

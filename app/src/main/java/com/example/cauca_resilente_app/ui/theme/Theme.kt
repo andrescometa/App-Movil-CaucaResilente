@@ -1,62 +1,63 @@
 package com.example.cauca_resilente_app.ui.theme
 
-import android.app.Activity
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
-
-
-
-private val DarkColorScheme = darkColorScheme(
-    primary = AzulOscuro,
-    secondary = AzulInstitucional,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Color.White,
-    secondary = AzulInstitucional,
-    tertiary = AzulOscuro
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+private val CaucaColorScheme = lightColorScheme(
+    primary = AppColors.Cobalt,
     onPrimary = Color.White,
-    onSecondary = Color.White,
+    primaryContainer = Color(0xFFDBEAFE),
+    onPrimaryContainer = AppColors.Navy,
+    secondary = AppColors.Amber,
+    onSecondary = AppColors.NavyDeep,
+    secondaryContainer = AppColors.AmberLight,
+    onSecondaryContainer = Color(0xFF78350F),
+    tertiary = AppColors.Emerald,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = AppColors.Background,
+    onBackground = AppColors.TextPrimary,
+    surface = AppColors.Surface,
+    onSurface = AppColors.TextPrimary,
+    surfaceVariant = AppColors.SurfaceSoft,
+    onSurfaceVariant = AppColors.TextSecondary,
+    outline = AppColors.Divider,
+    error = AppColors.Red,
+    onError = Color.White
 )
 
 @Composable
 fun Cauca_Resilente_AppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = false,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
+    val appType = rememberAppTypography()
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    // Escala tipográfica global: multiplica el `fontScale` del sistema para que
+    // TODO el texto de la app (incluidos los `sp` fijos de cada pantalla) se lea
+    // más grande. Se aplica sobre la densidad base, sin tocar la conversión dp.
+    val baseDensity = LocalDensity.current
+    val scaledDensity = remember(baseDensity) {
+        Density(
+            density = baseDensity.density,
+            fontScale = baseDensity.fontScale * APP_FONT_SCALE
+        )
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(
+        LocalDensity provides scaledDensity,
+        LocalAppTypography provides appType
+    ) {
+        MaterialTheme(
+            colorScheme = CaucaColorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

@@ -38,6 +38,9 @@ data class User(
         get() = listOf(name, apellidos.orEmpty())
             .filter { it.isNotBlank() }
             .joinToString(" ")
+
+    val esSocorrista: Boolean
+        get() = rol?.trim()?.lowercase() == "socorrista"
 }
 
 // --- Modelo para el Estado del Usuario (Interfaz 05 - Mi Estado) ---
@@ -141,7 +144,16 @@ data class RegisterRequest(
     @SerializedName("name") val name: String,
     @SerializedName("email") val email: String,
     @SerializedName("phone") val phone: String,
-    @SerializedName("password") val password: String
+    @SerializedName("password") val password: String,
+    @SerializedName("rol") val rol: String? = null,
+    @SerializedName("apellidos") val apellidos: String? = null,
+    @SerializedName("tipo_documento") val tipoDocumento: String? = null,
+    @SerializedName("identificacion") val identificacion: String? = null,
+    @SerializedName("genero") val genero: String? = null,
+    @SerializedName("edad") val edad: Int? = null,
+    @SerializedName("ciudad") val ciudad: String? = null,
+    @SerializedName("direccion") val direccion: String? = null,
+    @SerializedName("tipo_sangre") val tipoSangre: String? = null
 )
 
 // --- Contacto de emergencia ---
@@ -201,13 +213,34 @@ data class ZonasRiesgoResponse(
 
 data class SolicitudMapa(
     @SerializedName("_id") val id: String? = null,
+    @SerializedName("usuario_id") val usuarioId: String? = null,
     @SerializedName("tipo_ayuda") val tipoAyuda: String? = null,
     @SerializedName("descripcion_emergencia") val descripcionEmergencia: String? = null,
     @SerializedName("nivel_prioridad") val nivelPrioridad: String? = null,
     @SerializedName("estado_solicitud") val estadoSolicitud: String? = null,
     @SerializedName("latitud") val latitud: Double? = null,
     @SerializedName("longitud") val longitud: Double? = null,
+    @SerializedName("personas_afectadas") val personasAfectadas: Int? = null,
+    @SerializedName("requiere_ambulancia") val requiereAmbulancia: Boolean? = null,
     @SerializedName("fecha_hora") val fechaHora: String? = null
+)
+
+// --- Solicitudes asignadas al socorrista ---
+data class AsignacionSocorrista(
+    @SerializedName("_id") val id: String? = null,
+    @SerializedName("solicitud_id") val solicitud: SolicitudMapa? = null,
+    @SerializedName("estado_atencion") val estadoAtencion: String? = null,
+    @SerializedName("fecha_hora_asignacion") val fechaAsignacion: String? = null,
+    @SerializedName("fecha_hora_llegada") val fechaLlegada: String? = null,
+    @SerializedName("fecha_hora_cierre") val fechaCierre: String? = null,
+    @SerializedName("observaciones") val observaciones: String? = null,
+    @SerializedName("recursos_utilizados") val recursosUtilizados: List<String>? = null
+)
+
+data class AsignacionesResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("total") val total: Int? = null,
+    @SerializedName("asignaciones") val asignaciones: List<AsignacionSocorrista>? = null
 )
 
 data class SolicitudesMapaResponse(

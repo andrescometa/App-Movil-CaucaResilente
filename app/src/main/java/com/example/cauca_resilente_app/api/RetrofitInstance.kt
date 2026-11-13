@@ -21,7 +21,7 @@ object RetrofitInstance {
 
     private val authInterceptor = okhttp3.Interceptor { chain ->
         val token = SessionManager.getToken()
-        val request = if (token != null) {
+        val request = if (!token.isNullOrBlank() && chain.request().header("Authorization") == null) {
             chain.request().newBuilder().addHeader("Authorization", token).build()
         } else {
             chain.request()

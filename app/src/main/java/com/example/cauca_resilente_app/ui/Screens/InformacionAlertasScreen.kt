@@ -1,41 +1,78 @@
-package com.example.cauca_resilente_app.ui.Screens// ui/screens/InformacionAlertasScreen.kt
+package com.example.cauca_resilente_app.ui.Screens
+
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.cauca_resilente_app.api.AlertItem
 import com.example.cauca_resilente_app.ui.ViewModels.AlertasViewModel
-import com.example.cauca_resilente_app.ui.theme.*
+import com.example.cauca_resilente_app.ui.components.AppCard
+import com.example.cauca_resilente_app.ui.components.AppChip
+import com.example.cauca_resilente_app.ui.components.AppIconTile
+import com.example.cauca_resilente_app.ui.components.AppPrimaryButton
+import com.example.cauca_resilente_app.ui.components.AppScreenHeader
+import com.example.cauca_resilente_app.ui.components.StatusDot
+import com.example.cauca_resilente_app.ui.theme.AppDesign
+import com.example.cauca_resilente_app.ui.theme.appTypography
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val tabsInfo = listOf("Noticias", "Alertas", "Consejos")
+private val categorias = listOf("Noticia", "Alerta", "Recomendación")
+
 @Composable
 fun InformacionAlertasScreen(
     onBackClick: () -> Unit,
     onVerMasClick: (AlertItem) -> Unit,
     viewModel: AlertasViewModel,
-    tabInicial: Int = 0
+    tabInicial: Int = 0,
+    onNavItemSelected: (Int) -> Unit = {},
+    onSosClick: () -> Unit = {}
 ) {
+    val type = appTypography
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var tabSeleccionada by remember { mutableIntStateOf(tabInicial) }
-    val tabs = listOf("Noticias", "Alertas", "Recomendaciones")
-    val categorias = listOf("Noticia", "Alerta", "Recomendación")
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Mostrar error
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -44,138 +81,340 @@ fun InformacionAlertasScreen(
     }
 
     Scaffold(
-        containerColor = TextoBlanco,
+        containerColor = AppDesign.Background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Información y alertas", color = TextoBlanco, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = TextoBlanco)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.cargarAlertas() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Recargar", tint = TextoBlanco)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = AzulOscuro)
+        bottomBar = {
+            BottomNavBar(
+                selectedItem = -1,
+                onItemSelected = onNavItemSelected,
+                onSosClick = onSosClick
             )
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .statusBarsPadding()
         ) {
-            // ===== TABS =====
-            TabRow(
-                selectedTabIndex = tabSeleccionada,
-                containerColor = TextoBlanco,
-                contentColor = AzulOscuro,
-                indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier
-                            .tabIndicatorOffset(tabPositions[tabSeleccionada])
-                            .height(3.dp),
-                        color = AzulOscuro
-                    )
-                },
-                divider = { HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f)) }
+            AppScreenHeader(
+                title = "Información y alertas",
+                subtitle = "UniAutónoma Segura",
+                onBack = onBackClick,
+                actionIcon = Icons.Filled.FilterList,
+                onAction = { viewModel.cargarAlertas() },
+                actionBackground = AppDesign.SoftBg,
+                actionTint = AppDesign.TextSoft
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
             ) {
-                tabs.forEachIndexed { index, titulo ->
-                    Tab(
-                        selected = tabSeleccionada == index,
-                        onClick = { tabSeleccionada = index },
-                        text = {
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Tabs segmentados
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(AppDesign.CardRadius))
+                        .background(AppDesign.ChipBg)
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    tabsInfo.forEachIndexed { index, titulo ->
+                        val selected = tabSeleccionada == index
+                        val count = uiState.alertas.count { it.category.equals(categorias[index], ignoreCase = true) }
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (selected) AppDesign.Surface else Color.Transparent)
+                                .border(
+                                    1.dp,
+                                    if (selected) AppDesign.Border else Color.Transparent,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable { tabSeleccionada = index }
+                                .padding(vertical = 9.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
                                 titulo,
-                                fontSize = 14.sp,
-                                fontWeight = if (tabSeleccionada == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (tabSeleccionada == index) AzulOscuro else TextoOscuro.copy(alpha = 0.6f)
+                                color = if (selected) AppDesign.Primary else AppDesign.TextGray,
+                                fontSize = type.caption,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                             )
-                        }
-                    )
-                }
-            }
-
-            // ===== CONTENIDO =====
-            when {
-                uiState.isLoading && uiState.alertas.isEmpty() -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AzulOscuro)
-                    }
-                }
-                else -> {
-                    val listaActual = uiState.alertas.filter {
-                        it.category.equals(categorias[tabSeleccionada], ignoreCase = true)
-                    }
-
-                    if (listaActual.isEmpty()) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                "No hay contenido disponible en esta categoría.",
-                                color = TextoOscuro.copy(alpha = 0.6f),
-                                fontSize = 14.sp
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-                            contentPadding = PaddingValues(vertical = 20.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            items(listaActual) { item ->
-                                TarjetaInformacion(item = item, onClick = { onVerMasClick(item) })
-                            }
-
-                            item {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Button(
-                                    onClick = { viewModel.cargarAlertas() },
-                                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = AzulOscuro),
-                                    shape = RoundedCornerShape(12.dp)
+                            if (index == 1 && count > 0) {
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(AppDesign.ChipRadius))
+                                        .background(AppDesign.Danger)
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
                                 ) {
-                                    Text("Ver más información", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "$count",
+                                        color = Color.White,
+                                        fontSize = type.micro,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                if (uiState.isLoading && uiState.alertas.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AppDesign.Primary)
+                    }
+                } else {
+                    val lista = uiState.alertas.filter { it.category.equals(categorias[tabSeleccionada], ignoreCase = true) }
+                    val tarjetas = if (lista.isNotEmpty()) lista.map { it.toCard(tabSeleccionada) } else muestrasPorTab(tabSeleccionada)
+
+                    tarjetas.forEach { card ->
+                        TarjetaInformativa(card = card, onClick = { onVerMasClick(card.original ?: AlertItem()) })
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                AppPrimaryButton(
+                    text = "Ver más información y reportes",
+                    icon = Icons.Filled.ChevronRight,
+                    trailing = true,
+                    onClick = {
+                        if (tabSeleccionada < tabsInfo.lastIndex) tabSeleccionada++ else viewModel.cargarAlertas()
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
     }
 }
 
-@Composable
-private fun TarjetaInformacion(item: AlertItem, onClick: () -> Unit) {
-    val colorCategoria = when (item.category.lowercase()) {
-        "alerta" -> RojoEmergencia
-        "recomendación", "recomendacion" -> VerdeSeguro
-        else -> Color(0xFFF9A825) // Noticia
-    }
+private data class CardInfo(
+    val etiqueta: String,
+    val subtitulo: String,
+    val titulo: String,
+    val descripcion: String,
+    val fecha: String,
+    val accion: String,
+    val accent: Color,
+    val tagBg: Color,
+    val tagText: Color,
+    val iconBg: Color,
+    val iconTint: Color,
+    val icon: ImageVector,
+    val original: AlertItem? = null
+)
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = FondoClaro),
-        onClick = onClick
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Chip categoría
-            Box(
-                modifier = Modifier
-                    .background(colorCategoria, RoundedCornerShape(50))
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-            ) {
-                Text(item.category, color = TextoBlanco, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+private fun AlertItem.toCard(tab: Int): CardInfo = when (tab) {
+    1 -> CardInfo(
+        etiqueta = "Alerta",
+        subtitulo = nivelSeveridad?.trim()?.replaceFirstChar { it.uppercase() }?.let { "Riesgo $it" }
+            ?: "Riesgo Alto",
+        titulo = title,
+        descripcion = description.ifBlank { "Consulta los canales oficiales de prevención." },
+        fecha = listOf(date, time).filter { it.isNotBlank() }.joinToString(" • "),
+        accion = "Protocolo",
+        accent = AppDesign.Danger,
+        tagBg = AppDesign.Danger,
+        tagText = Color.White,
+        iconBg = AppDesign.DangerSoft,
+        iconTint = AppDesign.Danger,
+        icon = Icons.Filled.Warning,
+        original = this
+    )
+    2 -> CardInfo(
+        etiqueta = "Prevención",
+        subtitulo = "Ruta habilitada",
+        titulo = title,
+        descripcion = description.ifBlank { "Sigue las recomendaciones de las brigadas de emergencia." },
+        fecha = listOf(date, time).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "Hoy • 9:00 a. m." },
+        accion = "Ver mapa",
+        accent = AppDesign.Success,
+        tagBg = AppDesign.Success,
+        tagText = Color.White,
+        iconBg = AppDesign.SuccessSoft,
+        iconTint = AppDesign.SuccessDark,
+        icon = Icons.Filled.Explore,
+        original = this
+    )
+    else -> CardInfo(
+        etiqueta = "Aviso",
+        subtitulo = "Departamental",
+        titulo = title,
+        descripcion = description.ifBlank { "Mantente atento a los comunicados institucionales." },
+        fecha = listOf(date, time).filter { it.isNotBlank() }.joinToString(" • "),
+        accion = "Leer",
+        accent = AppDesign.Warning,
+        tagBg = AppDesign.Warning,
+        tagText = Color(0xFF0F172A),
+        iconBg = AppDesign.WarningSoft,
+        iconTint = AppDesign.WarningDark,
+        icon = Icons.Filled.Campaign,
+        original = this
+    )
+}
+
+private fun muestrasPorTab(tab: Int): List<CardInfo> = when (tab) {
+    1 -> listOf(
+        CardInfo(
+            etiqueta = "Alerta roja",
+            subtitulo = "Riesgo alto",
+            titulo = "Lluvias intensas en el norte del Cauca",
+            descripcion = "Se prevén precipitaciones torrenciales y aumento en los caudales de los ríos durante las próximas 12 horas. Mantente informado y sigue los canales oficiales de prevención.",
+            fecha = "12/05/2024 • 7:15 a. m.",
+            accion = "Protocolo",
+            accent = AppDesign.Danger,
+            tagBg = AppDesign.Danger,
+            tagText = Color.White,
+            iconBg = AppDesign.DangerSoft,
+            iconTint = AppDesign.Danger,
+            icon = Icons.Filled.Warning
+        )
+    )
+    2 -> listOf(
+        CardInfo(
+            etiqueta = "Prevención",
+            subtitulo = "Ruta habilitada",
+            titulo = "Ruta segura habilitada: Sector Histórico",
+            descripcion = "Acompañamiento preventivo activo por brigadistas y cuadrantes de seguridad entre el Campus Principal y Calle 5ta. Punto seguro de hidratación.",
+            fecha = "Hoy • 9:00 a. m.",
+            accion = "Ver mapa",
+            accent = AppDesign.Success,
+            tagBg = AppDesign.Success,
+            tagText = Color.White,
+            iconBg = AppDesign.SuccessSoft,
+            iconTint = AppDesign.SuccessDark,
+            icon = Icons.Filled.Explore
+        )
+    )
+    else -> listOf(
+        CardInfo(
+            etiqueta = "Aviso UA",
+            subtitulo = "Departamental",
+            titulo = "Simulacro departamental de evacuación",
+            descripcion = "Este 20 de mayo se realizará el ejercicio conjunto de respuesta y rescate. Consulta las rutas señalizadas y zonas seguras dentro del Campus La Casona.",
+            fecha = "12/05/2024 • 8:30 a. m.",
+            accion = "Leer",
+            accent = AppDesign.Warning,
+            tagBg = AppDesign.Warning,
+            tagText = Color(0xFF0F172A),
+            iconBg = AppDesign.WarningSoft,
+            iconTint = AppDesign.WarningDark,
+            icon = Icons.Filled.Campaign
+        )
+    )
+}
+
+@Composable
+private fun TarjetaInformativa(card: CardInfo, onClick: () -> Unit) {
+    val type = appTypography
+    AppCard(padding = 0.dp) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(card.accent)
+        )
+        Column(
+            modifier = Modifier
+                .clickable { onClick() }
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.Top) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AppChip(
+                        text = card.etiqueta.uppercase(),
+                        color = card.tagText,
+                        background = card.tagBg,
+                        dotColor = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AppChip(
+                        text = card.subtitulo,
+                        color = card.tagBg,
+                        background = card.tagBg.copy(alpha = 0.10f)
+                    )
+                }
+                AppIconTile(
+                    icon = card.icon,
+                    tint = card.iconTint,
+                    background = card.iconBg,
+                    size = 44.dp,
+                    iconSize = 22.dp
+                )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(item.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextoOscuro)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                card.titulo,
+                color = AppDesign.Heading,
+                fontSize = type.label,
+                fontWeight = FontWeight.Bold,
+                lineHeight = type.labelLineHeight
+            )
             Spacer(modifier = Modifier.height(6.dp))
-            Text(item.description, fontSize = 13.sp, color = TextoOscuro.copy(alpha = 0.7f), lineHeight = 18.sp)
+            Text(
+                card.descripcion,
+                color = AppDesign.TextGray,
+                fontSize = type.bodySmall,
+                lineHeight = type.bodySmallLineHeight
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(AppDesign.Border)
+            )
             Spacer(modifier = Modifier.height(10.dp))
-            Text("${item.date} • ${item.time}", fontSize = 11.sp, color = TextoOscuro.copy(alpha = 0.5f))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.Schedule,
+                    contentDescription = null,
+                    tint = AppDesign.TextMuted,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(5.dp))
+                Text(
+                    card.fecha.ifBlank { "Ahora" },
+                    color = AppDesign.TextMuted,
+                    fontSize = type.caption,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    card.accion,
+                    color = card.accent,
+                    fontSize = type.caption,
+                    fontWeight = FontWeight.Bold
+                )
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = null,
+                    tint = card.accent,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
         }
     }
 }

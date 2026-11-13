@@ -5,6 +5,7 @@ sealed class Screen(val route: String) {
     object Bienvenida : Screen("bienvenida")
     object Login : Screen("login")
     object Registro : Screen("registro")
+    object RegistroSocorrista : Screen("registro_socorrista")
     object Home : Screen("home")
     object Mapa : Screen("mapa")
 
@@ -15,6 +16,7 @@ sealed class Screen(val route: String) {
 
     object MiEstado : Screen("mi_estado")
     object SolicitarAyuda : Screen("solicitar_ayuda")
+    object SolicitudesAsignadas : Screen("solicitudes_asignadas")
     object MiUbicacion : Screen("mi_ubicacion")
     object Informacion : Screen("informacion")
 

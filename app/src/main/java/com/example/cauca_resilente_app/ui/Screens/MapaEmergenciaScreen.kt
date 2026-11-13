@@ -4,51 +4,82 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.cauca_resilente_app.api.SessionManager
 import com.example.cauca_resilente_app.location.obtenerUbicacionActual
 import com.example.cauca_resilente_app.location.tienePermisoUbicacion
 import com.example.cauca_resilente_app.ui.ViewModels.FiltroMapa
 import com.example.cauca_resilente_app.ui.ViewModels.MapaViewModel
-import com.example.cauca_resilente_app.ui.components.MapaLibreView
+import com.example.cauca_resilente_app.ui.components.MapaGoogleView
 import com.example.cauca_resilente_app.ui.components.PuntoMapa
+import com.example.cauca_resilente_app.ui.components.StatusDot
 import com.example.cauca_resilente_app.ui.components.TipoPuntoMapa
-import com.example.cauca_resilente_app.ui.theme.AzulOscuro
-import com.example.cauca_resilente_app.ui.theme.FondoClaro
-import com.example.cauca_resilente_app.ui.theme.TextoBlanco
-import com.example.cauca_resilente_app.ui.theme.TextoOscuro
-import org.maplibre.android.geometry.LatLng
+import com.example.cauca_resilente_app.ui.theme.AppDesign
+import com.example.cauca_resilente_app.ui.theme.appTypography
+import com.google.android.gms.maps.model.LatLng
 
 private const val LATITUD_POR_DEFECTO = 2.4448
 private const val LONGITUD_POR_DEFECTO = -76.6147
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapaEmergenciaScreen(
     onMenuClick: () -> Unit,
     onNavItemSelected: (Int) -> Unit,
     onSosClick: () -> Unit,
-    viewModel: MapaViewModel
+    viewModel: MapaViewModel,
+    mostrarSos: Boolean = true
 ) {
+    val type = appTypography
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val esSocorrista = SessionManager.getUser()?.esSocorrista == true
 
     var ubicacionActual by remember { mutableStateOf<LatLng?>(null) }
     var permisoConcedido by remember { mutableStateOf(tienePermisoUbicacion(context)) }
@@ -141,7 +172,7 @@ fun MapaEmergenciaScreen(
                         latitud = usuario.latitude,
                         longitud = usuario.longitude,
                         titulo = usuario.name ?: "Usuario",
-                        descripcion = "Ubicación reportada",
+                        descripcion = if (esSocorrista) "Ubicación reportada" else "Contacto de emergencia",
                         tipo = TipoPuntoMapa.USUARIO
                     )
                 )
@@ -163,122 +194,232 @@ fun MapaEmergenciaScreen(
     }
 
     Scaffold(
-        containerColor = FondoClaro,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            BottomNavBar(
-                selectedItem = 1,
-                onItemSelected = onNavItemSelected,
-                onSosClick = onSosClick
-            )
-        }
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            MapaLibreView(
+        Box(modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            MapaGoogleView(
                 puntos = puntos,
                 centroInicial = LatLng(LATITUD_POR_DEFECTO, LONGITUD_POR_DEFECTO),
                 zoomInicial = 13.5,
+                mostrarControlesZoom = false,
                 centrarEn = ubicacionActual,
                 solicitudCentrado = centrarEnUbicacion,
                 modifier = Modifier.fillMaxSize()
             )
 
-            // ===== ENCABEZADO SUPERPUESTO =====
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(AzulOscuro, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Menú", tint = TextoBlanco)
-                    }
-                    Text(
-                        "Mapa de emergencia",
-                        color = TextoBlanco,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = TextoBlanco,
-                            strokeWidth = 2.dp
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(AppDesign.CardRadius))
+                            .background(AppDesign.Surface)
+                            .border(1.dp, AppDesign.Border, RoundedCornerShape(AppDesign.CardRadius))
+                            .clickable { onMenuClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Filled.Menu,
+                            contentDescription = "Menú",
+                            tint = AppDesign.Heading,
+                            modifier = Modifier.size(21.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                    IconButton(onClick = { viewModel.cargarDatos() }) {
-                        Icon(Icons.Filled.Refresh, contentDescription = "Recargar", tint = TextoBlanco)
+
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(AppDesign.CardRadius))
+                                .background(AppDesign.Surface)
+                                .border(
+                                    1.dp,
+                                    AppDesign.Border,
+                                    RoundedCornerShape(AppDesign.CardRadius)
+                                )
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "Mapa de emergencia",
+                                color = AppDesign.Heading,
+                                fontSize = type.sectionTitle,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                StatusDot(AppDesign.Success, size = 6.dp)
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    "EN VIVO • RED UA",
+                                    color = AppDesign.SuccessDark,
+                                    fontSize = type.micro,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
-                    IconButton(onClick = { /* TODO: opciones de filtro avanzado */ }) {
-                        Icon(Icons.Filled.FilterList, contentDescription = "Filtros", tint = TextoBlanco)
+
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(AppDesign.CardRadius))
+                            .background(AppDesign.Surface)
+                            .border(1.dp, AppDesign.Border, RoundedCornerShape(AppDesign.CardRadius))
+                            .clickable { viewModel.cargarDatos() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = AppDesign.Primary,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                Icons.Filled.FilterList,
+                                contentDescription = "Filtros",
+                                tint = AppDesign.Heading,
+                                modifier = Modifier.size(21.dp)
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FiltroMapa.entries.forEach { filtro ->
+                    val filtros = if (esSocorrista) FiltroMapa.entries else listOf(FiltroMapa.TODOS, FiltroMapa.USUARIOS, FiltroMapa.ALERTAS)
+                    filtros.forEach { filtro ->
                         FiltroChip(
-                            filtro = filtro,
+                            titulo = when {
+                                !esSocorrista && filtro == FiltroMapa.USUARIOS -> "Contactos"
+                                !esSocorrista && filtro == FiltroMapa.ALERTAS -> "Zonas"
+                                else -> filtro.titulo
+                            },
                             seleccionado = uiState.filtroSeleccionado == filtro,
                             onClick = { viewModel.cambiarFiltro(filtro) }
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clip(RoundedCornerShape(AppDesign.ChipRadius))
+                        .background(AppDesign.Surface)
+                        .border(1.dp, AppDesign.Border, RoundedCornerShape(AppDesign.ChipRadius))
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatusDot(AppDesign.Primary, size = 6.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "${uiState.usuarios.size} contactos cerca • ${uiState.zonas.size} zonas",
+                        color = AppDesign.TextSoft,
+                        fontSize = type.caption,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
-            // ===== BOTÓN DE UBICACIÓN ACTUAL =====
-            FloatingActionButton(
-                onClick = { centrarEnUbicacion++ },
+            // Herramientas flotantes
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 20.dp)
-                    .size(52.dp),
-                containerColor = AzulOscuro,
-                contentColor = TextoBlanco,
-                shape = CircleShape
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp, bottom = 100.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Icon(Icons.Filled.MyLocation, contentDescription = "Mi ubicación")
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .shadow(8.dp, RoundedCornerShape(AppDesign.CardRadius), spotColor = Color.Black.copy(alpha = 0.18f))
+                        .clip(RoundedCornerShape(AppDesign.CardRadius))
+                        .background(Color.White.copy(alpha = 0.88f))
+                        .border(1.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(AppDesign.CardRadius))
+                        .clickable { },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Layers,
+                        contentDescription = "Capas",
+                        tint = AppDesign.TextSoft,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .shadow(8.dp, RoundedCornerShape(AppDesign.CardRadius), spotColor = Color.Black.copy(alpha = 0.18f))
+                        .clip(RoundedCornerShape(AppDesign.CardRadius))
+                        .background(Color.White.copy(alpha = 0.88f))
+                        .border(1.dp, AppDesign.PrimaryBorder, RoundedCornerShape(AppDesign.CardRadius))
+                        .clickable { centrarEnUbicacion++ },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.MyLocation,
+                        contentDescription = "Mi ubicación",
+                        tint = AppDesign.Primary,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
             }
+
+            // Barra inferior flotante sobre el mapa
+            BottomNavBar(
+                selectedItem = 1,
+                onItemSelected = onNavItemSelected,
+                onSosClick = onSosClick,
+                mostrarSos = mostrarSos,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }
 
 @Composable
 private fun FiltroChip(
-    filtro: FiltroMapa,
+    titulo: String,
     seleccionado: Boolean,
     onClick: () -> Unit
 ) {
+    val type = appTypography
     Box(
         modifier = Modifier
-            .background(
-                color = if (seleccionado) AzulOscuro else TextoBlanco,
-                shape = RoundedCornerShape(20.dp)
+            .clip(RoundedCornerShape(AppDesign.ChipRadius))
+            .background(if (seleccionado) AppDesign.Primary else AppDesign.Surface)
+            .border(
+                1.dp,
+                if (seleccionado) AppDesign.Primary else AppDesign.Border,
+                RoundedCornerShape(AppDesign.ChipRadius)
             )
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         Text(
-            text = filtro.titulo,
-            fontSize = 13.sp,
-            fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Medium,
-            color = if (seleccionado) TextoBlanco else TextoOscuro.copy(alpha = 0.7f)
+            text = titulo,
+            fontSize = type.caption,
+            fontWeight = FontWeight.Bold,
+            color = if (seleccionado) Color.White else AppDesign.TextSoft
         )
     }
 }
