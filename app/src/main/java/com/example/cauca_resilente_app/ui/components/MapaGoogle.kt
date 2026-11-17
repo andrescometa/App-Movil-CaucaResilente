@@ -9,17 +9,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.cauca_resilente_app.ui.theme.AppDesign
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.Circle
+import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+
+private const val RADIO_ZONA_POR_DEFECTO = 300.0
+private const val TAMANO_MARCADOR_PX = 88
+private const val BORDE_MARCADOR_PX = 5
+private const val FOTO_MARCADOR_MAX_PX = 120
 
 enum class TipoPuntoMapa {
     ZONA,
@@ -32,7 +43,10 @@ data class PuntoMapa(
     val longitud: Double,
     val titulo: String,
     val descripcion: String = "",
-    val tipo: TipoPuntoMapa = TipoPuntoMapa.ZONA
+    val tipo: TipoPuntoMapa = TipoPuntoMapa.ZONA,
+    val radioMetros: Double? = null,
+    val foto: String? = null,
+    val iniciales: String? = null
 )
 
 @Composable
@@ -43,7 +57,9 @@ fun MapaGoogleView(
     interactivo: Boolean = true,
     mostrarControlesZoom: Boolean = true,
     centrarEn: LatLng? = null,
+    centrarEnSolicitud: LatLng? = null,
     solicitudCentrado: Int = 0,
+    versionFocoSolicitud: Int = 0,
     actualizarCentroConDatos: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -59,6 +75,8 @@ fun MapaGoogleView(
     val puntosActuales by rememberUpdatedState(puntos)
     val centroActual by rememberUpdatedState(centroInicial)
     val centrarActual by rememberUpdatedState(centrarEn)
+    val centrarSolicitudActual by rememberUpdatedState(centrarEnSolicitud)
+    val cacheFotos = remember { mutableMapOf<String, BitmapDescriptor>() }
 
     DisposableEffect(lifecycleOwner, mapView) {
         val observer = LifecycleEventObserver { _, event ->
@@ -113,18 +131,66 @@ fun MapaGoogleView(
     LaunchedEffect(mapa, puntos) {
         val map = mapa ?: return@LaunchedEffect
         map.clear()
+
+        val marcadoresDeZona = mutableMapOf<Circle, Marker>()
+
         puntos.forEach { punto ->
-            map.addMarker(
-                MarkerOptions()
-                    .position(LatLng(punto.latitud, punto.longitud))
+            val posicion = LatLng(punto.latitud, punto.longitud)
+            if (punto.tipo == TipoPuntoMapa.ZONA) {
+                val marcador = map.addMarker(
+                    MarkerOptions()
+                        .position(posicion)
+                        .title(punto.titulo)
+                        .snippet(punto.descripcion)
+                        .alpha(0f)
+                )
+                val circulo = map.addCircle(
+                    CircleOptions()
+                        .center(posicion)
+                        .radius(punto.radioMetros?.takeIf { it > 0 } ?: RADIO_ZONA_POR_DEFECTO)
+                        .strokeWidth(3f)
+                        .strokeColor(AppDesign.Danger.toArgb())
+                        .fillColor(AppDesign.Danger.copy(alpha = 0.22f).toArgb())
+                )
+                if (marcador != null) marcadoresDeZona[circulo] = marcador
+            } else {
+                val foto = punto.foto?.takeIf { it.isNotBlank() }
+                val etiqueta = punto.iniciales ?: inicialesDe(punto.titulo)
+                val clave = foto ?: "iniciales:${punto.tipo.name}:$etiqueta:$TAMANO_MARCADOR_PX"
+
+                val icono = cacheFotos[clave] ?: run {
+                    val bitmap = if (foto != null) {
+                        fotoABitmap(foto, maxDimension = FOTO_MARCADOR_MAX_PX)?.let {
+                            bitmapCircular(it, TAMANO_MARCADOR_PX, BORDE_MARCADOR_PX)
+                        }
+                    } else {
+                        bitmapIniciales(
+                            etiqueta,
+                            colorCirculo(punto.tipo),
+                            TAMANO_MARCADOR_PX,
+                            BORDE_MARCADOR_PX
+                        )
+                    }
+                    val descriptor = bitmap?.let { BitmapDescriptorFactory.fromBitmap(it) }
+                    if (descriptor != null) cacheFotos[clave] = descriptor
+                    descriptor
+                }
+
+                val opciones = MarkerOptions()
+                    .position(posicion)
                     .title(punto.titulo)
                     .snippet(punto.descripcion)
                     .icon(
-                        BitmapDescriptorFactory.defaultMarker(
-                            colorPara(punto.tipo)
-                        )
+                        icono ?: BitmapDescriptorFactory.defaultMarker(colorPara(punto.tipo))
                     )
-            )
+                    .anchor(0.5f, 0.5f)
+
+                map.addMarker(opciones)
+            }
+        }
+
+        map.setOnCircleClickListener { circulo ->
+            marcadoresDeZona[circulo]?.showInfoWindow()
         }
     }
 
@@ -138,9 +204,20 @@ fun MapaGoogleView(
         }
     }
 
-    LaunchedEffect(solicitudCentrado) {
+    LaunchedEffect(solicitudCentrado, mapa) {
         if (solicitudCentrado > 0) {
             val destino = centrarActual ?: centroActual
+            mapa?.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(destino, 16f),
+                800,
+                null
+            )
+        }
+    }
+
+    LaunchedEffect(versionFocoSolicitud, mapa) {
+        if (versionFocoSolicitud > 0) {
+            val destino = centrarSolicitudActual ?: return@LaunchedEffect
             mapa?.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(destino, 16f),
                 800,
@@ -153,6 +230,12 @@ fun MapaGoogleView(
         factory = { mapView },
         modifier = modifier
     )
+}
+
+private fun colorCirculo(tipo: TipoPuntoMapa): Int = when (tipo) {
+    TipoPuntoMapa.SOLICITUD -> android.graphics.Color.rgb(198, 40, 40)
+    TipoPuntoMapa.USUARIO -> android.graphics.Color.rgb(21, 72, 156)
+    TipoPuntoMapa.ZONA -> android.graphics.Color.rgb(198, 40, 40)
 }
 
 private fun colorPara(tipo: TipoPuntoMapa): Float = when (tipo) {

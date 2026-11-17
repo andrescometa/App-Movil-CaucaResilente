@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "495360540864",
+    "project_id": "cauca-resilente",
+    "storage_bucket": "cauca-resilente.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:495360540864:android:cc76a61a34e357c7eead25",
+        "android_client_info": {
+          "package_name": "com.example.cauca_resilente_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA30iSUHNkYq1KWZnNWAKBHeddJc7KnKEw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

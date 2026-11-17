@@ -21,11 +21,22 @@ enum class FiltroMapa(val titulo: String) {
     ALERTAS("Alertas")
 }
 
+data class FocoSolicitudMapa(
+    val latitud: Double,
+    val longitud: Double,
+    val titulo: String,
+    val descripcion: String,
+    val foto: String? = null,
+    val iniciales: String? = null
+)
+
 data class MapaUiState(
     val filtroSeleccionado: FiltroMapa = FiltroMapa.TODOS,
     val zonas: List<ZonaRiesgoMapa> = emptyList(),
     val solicitudes: List<SolicitudMapa> = emptyList(),
     val usuarios: List<MapPoint> = emptyList(),
+    val focoSolicitud: FocoSolicitudMapa? = null,
+    val focoSolicitudVersion: Int = 0,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val latitudActual: Double = 2.4448,
@@ -44,6 +55,29 @@ class MapaViewModel(private val api: CaucaResilienteApiService) : ViewModel() {
         _uiState.value = _uiState.value.copy(
             latitudActual = latitud,
             longitudActual = longitud
+        )
+    }
+
+    fun enfocarSolicitud(
+        latitud: Double,
+        longitud: Double,
+        titulo: String,
+        descripcion: String,
+        foto: String? = null,
+        iniciales: String? = null
+    ) {
+        val estado = _uiState.value
+        _uiState.value = estado.copy(
+            filtroSeleccionado = FiltroMapa.TODOS,
+            focoSolicitud = FocoSolicitudMapa(
+                latitud = latitud,
+                longitud = longitud,
+                titulo = titulo,
+                descripcion = descripcion,
+                foto = foto,
+                iniciales = iniciales
+            ),
+            focoSolicitudVersion = estado.focoSolicitudVersion + 1
         )
     }
 

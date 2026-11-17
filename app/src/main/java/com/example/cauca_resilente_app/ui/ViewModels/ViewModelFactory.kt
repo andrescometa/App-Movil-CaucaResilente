@@ -23,6 +23,8 @@ class ViewModelFactory(private  val api: CaucaResilienteApiService) : ViewModelP
                 ContactosViewModel(api) as T
             modelClass.isAssignableFrom(SolicitudesAsignadasViewModel::class.java) ->
                 SolicitudesAsignadasViewModel(api) as T
+            modelClass.isAssignableFrom(NotificacionSocorristaViewModel::class.java) ->
+                NotificacionSocorristaViewModel(api) as T
             else -> throw IllegalArgumentException("ViewModel desconocido: ${modelClass.name}")
         }
     }

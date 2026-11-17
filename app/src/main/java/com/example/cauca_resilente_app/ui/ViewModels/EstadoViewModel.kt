@@ -48,8 +48,15 @@ class EstadoViewModel(private val api: CaucaResilienteApiService) : ViewModel() 
             return
         }
 
+        val estadoAnterior = _uiState.value.estadoActual
+
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null,
+                mensajeExito = null,
+                estadoActual = nuevoEstado
+            )
 
             try {
                 val response = api.updateStatus(
@@ -64,11 +71,13 @@ class EstadoViewModel(private val api: CaucaResilienteApiService) : ViewModel() 
             } catch (e: HttpException) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    estadoActual = estadoAnterior,
                     errorMessage = "No se pudo actualizar el estado (HTTP ${e.code()})"
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    estadoActual = estadoAnterior,
                     errorMessage = "Error de conexión: ${e.message}"
                 )
             }

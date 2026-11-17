@@ -13,6 +13,23 @@ data class LoginResponse(
     @SerializedName("user") val user: User
 )
 
+// --- Edición del perfil (Interfaz Perfil / Editar perfil) ---
+data class ActualizarPerfilRequest(
+    @SerializedName("nombres") val nombres: String,
+    @SerializedName("apellidos") val apellidos: String,
+    @SerializedName("telefono") val telefono: String,
+    @SerializedName("email") val email: String
+)
+
+data class ActualizarFotoRequest(
+    @SerializedName("foto") val foto: String?
+)
+
+data class PerfilResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("usuario") val usuario: User? = null
+)
+
 // --- Modelo para el Usuario (Interfaz 09 - Perfil) ---
 data class User(
     @SerializedName("id") val id: String,
@@ -29,6 +46,7 @@ data class User(
     @SerializedName("ciudad") val ciudad: String? = null,
     @SerializedName("direccion") val direccion: String? = null,
     @SerializedName("tipo_sangre") val tipoSangre: String? = null,
+    @SerializedName("foto") val foto: String? = null,
     @SerializedName("rol") val rol: String? = null,
     @SerializedName("fecha_registro") val fechaRegistro: String? = null,
     @SerializedName("contacto_emergencia") val contactoEmergencia: EmergencyContact? = null
@@ -94,7 +112,8 @@ data class MapPoint(
     @SerializedName("longitude") val longitude: Double,
     @SerializedName("type") val type: String, // "usuario", "ayuda", "alerta"
     @SerializedName("intensity") val intensity: Int, // Para los círculos de colores (1-10)
-    @SerializedName("name") val name: String? = null
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("photo") val foto: String? = null
 )
 
 // --- Modelo para Alertas y Noticias (Interfaz 08) ---
@@ -103,20 +122,24 @@ data class AlertItem(
     @SerializedName("_id") val id: String? = null,
     @SerializedName("tipo_alerta") val tipoAlerta: String? = null,
     @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("categoria") val categoria: String? = null,
     @SerializedName("nivel_severidad") val nivelSeveridad: String? = null,
     @SerializedName("zona_afectada") val zonaAfectada: CoordenadasGeo? = null,
     @SerializedName("radio_metros") val radioMetros: Double? = null,
+    @SerializedName("fuente") val fuente: String? = null,
+    @SerializedName("url_oficial") val urlOficial: String? = null,
     @SerializedName("activa") val activa: Boolean? = null,
     @SerializedName("fecha_emision") val fechaEmision: String? = null,
-    @SerializedName("fecha_expiracion") val fechaExpiracion: String? = null
+    @SerializedName("fecha_expiracion") val fechaExpiracion: String? = null,
+    @SerializedName("fecha_actualizacion") val fechaActualizacion: String? = null
 ) {
     // Propiedades que usa la interfaz, derivadas del esquema del backend.
     val title: String get() = tipoAlerta?.takeIf { it.isNotBlank() } ?: "Alerta"
     val description: String get() = mensaje.orEmpty()
 
-    // Se reparten las severidades del backend entre las pestañas de la pantalla.
+    // La categoría la define el administrador; si falta, se deduce de la severidad.
     val category: String
-        get() = when (nivelSeveridad?.trim()?.lowercase()) {
+        get() = categoria?.takeIf { it.isNotBlank() } ?: when (nivelSeveridad?.trim()?.lowercase()) {
             "crítica", "critica", "urgente" -> "Alerta"
             "preventiva" -> "Recomendación"
             else -> "Noticia"
@@ -222,7 +245,8 @@ data class SolicitudMapa(
     @SerializedName("longitud") val longitud: Double? = null,
     @SerializedName("personas_afectadas") val personasAfectadas: Int? = null,
     @SerializedName("requiere_ambulancia") val requiereAmbulancia: Boolean? = null,
-    @SerializedName("fecha_hora") val fechaHora: String? = null
+    @SerializedName("fecha_hora") val fechaHora: String? = null,
+    @SerializedName("usuario") val usuario: UsuarioSolicitud? = null
 )
 
 // --- Solicitudes asignadas al socorrista ---
@@ -243,10 +267,88 @@ data class AsignacionesResponse(
     @SerializedName("asignaciones") val asignaciones: List<AsignacionSocorrista>? = null
 )
 
+// --- Seguimiento de una solicitud (para la isla de notificación SOS) ---
+data class AsignacionSeguimiento(
+    @SerializedName("_id") val id: String? = null,
+    @SerializedName("solicitud_id") val solicitudId: String? = null,
+    @SerializedName("organismo_id") val organismoId: String? = null,
+    @SerializedName("socorrista_usuario_id") val socorristaUsuarioId: String? = null,
+    @SerializedName("socorrista_id") val socorristaId: String? = null,
+    @SerializedName("estado_atencion") val estadoAtencion: String? = null,
+    @SerializedName("fecha_hora_asignacion") val fechaAsignacion: String? = null,
+    @SerializedName("fecha_hora_llegada") val fechaLlegada: String? = null,
+    @SerializedName("fecha_hora_cierre") val fechaCierre: String? = null
+)
+
+data class SeguimientoSolicitudResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("solicitud") val solicitud: SolicitudMapa? = null,
+    @SerializedName("asignacion") val asignacion: AsignacionSeguimiento? = null
+)
+
 data class SolicitudesMapaResponse(
     @SerializedName("mensaje") val mensaje: String? = null,
     @SerializedName("total") val total: Int? = null,
     @SerializedName("solicitudes") val solicitudes: List<SolicitudMapa>? = null
+)
+
+// --- Notificación de solicitudes pendientes para el socorrista ---
+data class UsuarioSolicitud(
+    @SerializedName("_id") val id: String? = null,
+    @SerializedName("nombres") val nombres: String? = null,
+    @SerializedName("apellidos") val apellidos: String? = null,
+    @SerializedName("telefono") val telefono: String? = null,
+    @SerializedName("direccion") val direccion: String? = null,
+    @SerializedName("foto") val foto: String? = null
+) {
+    val nombreCompleto: String
+        get() = listOf(nombres.orEmpty(), apellidos.orEmpty())
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
+            .ifBlank { "Usuario" }
+}
+
+data class UbicacionTiempoReal(
+    @SerializedName("latitud") val latitud: Double? = null,
+    @SerializedName("longitud") val longitud: Double? = null,
+    @SerializedName("fecha_hora") val fechaHora: String? = null,
+    @SerializedName("precision_metros") val precisionMetros: Double? = null,
+    @SerializedName("direccion_aproximada") val direccionAproximada: String? = null
+)
+
+data class SolicitudPendienteSocorrista(
+    @SerializedName("_id") val id: String? = null,
+    @SerializedName("usuario_id") val usuarioId: String? = null,
+    @SerializedName("tipo_ayuda") val tipoAyuda: String? = null,
+    @SerializedName("descripcion_emergencia") val descripcionEmergencia: String? = null,
+    @SerializedName("nivel_prioridad") val nivelPrioridad: String? = null,
+    @SerializedName("estado_solicitud") val estadoSolicitud: String? = null,
+    @SerializedName("latitud") val latitud: Double? = null,
+    @SerializedName("longitud") val longitud: Double? = null,
+    @SerializedName("personas_afectadas") val personasAfectadas: Int? = null,
+    @SerializedName("requiere_ambulancia") val requiereAmbulancia: Boolean? = null,
+    @SerializedName("fecha_hora") val fechaHora: String? = null,
+    @SerializedName("usuario") val usuario: UsuarioSolicitud? = null,
+    @SerializedName("ubicacion_tiempo_real") val ubicacion: UbicacionTiempoReal? = null
+) {
+    val latitudReal: Double? get() = ubicacion?.latitud ?: latitud
+    val longitudReal: Double? get() = ubicacion?.longitud ?: longitud
+}
+
+data class SolicitudesPendientesResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("total") val total: Int? = null,
+    @SerializedName("solicitudes") val solicitudes: List<SolicitudPendienteSocorrista>? = null
+)
+
+data class CrearAsignacionRequest(
+    @SerializedName("solicitud_id") val solicitudId: String,
+    @SerializedName("socorrista_usuario_id") val socorristaUsuarioId: String
+)
+
+data class CrearAsignacionResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("asignacion") val asignacion: AsignacionSeguimiento? = null
 )
 
 // --- Modelos para el historial de ubicaciones (Interfaz Mi ubicación) ---

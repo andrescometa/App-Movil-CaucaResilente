@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.cauca_resilente_app.api.AlertItem
+import com.example.cauca_resilente_app.ui.AlertRefreshBus
 import com.example.cauca_resilente_app.ui.ViewModels.AlertasViewModel
 import com.example.cauca_resilente_app.ui.components.AppCard
 import com.example.cauca_resilente_app.ui.components.AppChip
@@ -77,6 +78,20 @@ fun InformacionAlertasScreen(
         uiState.errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.limpiarError()
+        }
+    }
+
+    // Refresco periódico para mostrar alertas nuevas mientras la pantalla está abierta.
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000)
+            viewModel.cargarAlertas()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        AlertRefreshBus.events.collect {
+            viewModel.cargarAlertas()
         }
     }
 
@@ -178,12 +193,43 @@ fun InformacionAlertasScreen(
                         CircularProgressIndicator(color = AppDesign.Primary)
                     }
                 } else {
-                    val lista = uiState.alertas.filter { it.category.equals(categorias[tabSeleccionada], ignoreCase = true) }
-                    val tarjetas = if (lista.isNotEmpty()) lista.map { it.toCard(tabSeleccionada) } else muestrasPorTab(tabSeleccionada)
+                    val lista = uiState.alertas.filter {
+                        it.category.equals(categorias[tabSeleccionada], ignoreCase = true)
+                    }
 
-                    tarjetas.forEach { card ->
-                        TarjetaInformativa(card = card, onClick = { onVerMasClick(card.original ?: AlertItem()) })
-                        Spacer(modifier = Modifier.height(14.dp))
+                    if (lista.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 40.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                val plural = when (categorias[tabSeleccionada]) {
+                                    "Noticia" -> "noticias"
+                                    "Alerta" -> "alertas"
+                                    else -> "recomendaciones"
+                                }
+                                Text(
+                                    text = "No hay $plural activas",
+                                    color = AppDesign.TextGray,
+                                    fontSize = type.body,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Actualiza para consultar los últimos reportes.",
+                                    color = AppDesign.TextMuted,
+                                    fontSize = type.caption
+                                )
+                            }
+                        }
+                    } else {
+                        lista.forEach { alerta ->
+                            val card = alerta.toCard(tabSeleccionada)
+                            TarjetaInformativa(card = card, onClick = { onVerMasClick(alerta) })
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
                     }
                 }
 
@@ -266,57 +312,6 @@ private fun AlertItem.toCard(tab: Int): CardInfo = when (tab) {
         iconTint = AppDesign.WarningDark,
         icon = Icons.Filled.Campaign,
         original = this
-    )
-}
-
-private fun muestrasPorTab(tab: Int): List<CardInfo> = when (tab) {
-    1 -> listOf(
-        CardInfo(
-            etiqueta = "Alerta roja",
-            subtitulo = "Riesgo alto",
-            titulo = "Lluvias intensas en el norte del Cauca",
-            descripcion = "Se prevén precipitaciones torrenciales y aumento en los caudales de los ríos durante las próximas 12 horas. Mantente informado y sigue los canales oficiales de prevención.",
-            fecha = "12/05/2024 • 7:15 a. m.",
-            accion = "Protocolo",
-            accent = AppDesign.Danger,
-            tagBg = AppDesign.Danger,
-            tagText = Color.White,
-            iconBg = AppDesign.DangerSoft,
-            iconTint = AppDesign.Danger,
-            icon = Icons.Filled.Warning
-        )
-    )
-    2 -> listOf(
-        CardInfo(
-            etiqueta = "Prevención",
-            subtitulo = "Ruta habilitada",
-            titulo = "Ruta segura habilitada: Sector Histórico",
-            descripcion = "Acompañamiento preventivo activo por brigadistas y cuadrantes de seguridad entre el Campus Principal y Calle 5ta. Punto seguro de hidratación.",
-            fecha = "Hoy • 9:00 a. m.",
-            accion = "Ver mapa",
-            accent = AppDesign.Success,
-            tagBg = AppDesign.Success,
-            tagText = Color.White,
-            iconBg = AppDesign.SuccessSoft,
-            iconTint = AppDesign.SuccessDark,
-            icon = Icons.Filled.Explore
-        )
-    )
-    else -> listOf(
-        CardInfo(
-            etiqueta = "Aviso UA",
-            subtitulo = "Departamental",
-            titulo = "Simulacro departamental de evacuación",
-            descripcion = "Este 20 de mayo se realizará el ejercicio conjunto de respuesta y rescate. Consulta las rutas señalizadas y zonas seguras dentro del Campus La Casona.",
-            fecha = "12/05/2024 • 8:30 a. m.",
-            accion = "Leer",
-            accent = AppDesign.Warning,
-            tagBg = AppDesign.Warning,
-            tagText = Color(0xFF0F172A),
-            iconBg = AppDesign.WarningSoft,
-            iconTint = AppDesign.WarningDark,
-            icon = Icons.Filled.Campaign
-        )
     )
 }
 

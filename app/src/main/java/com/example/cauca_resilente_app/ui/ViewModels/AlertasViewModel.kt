@@ -12,7 +12,10 @@ import kotlinx.coroutines.launch
 data class AlertasUiState(
     val alertas: List<AlertItem> = emptyList(),
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val alertaSeleccionada: AlertItem? = null,
+    val cargandoDetalle: Boolean = false,
+    val errorDetalle: String? = null
 )
 
 class AlertasViewModel(private val api: CaucaResilienteApiService) : ViewModel() {
@@ -51,6 +54,68 @@ class AlertasViewModel(private val api: CaucaResilienteApiService) : ViewModel()
 
     fun limpiarError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    // Carga una alerta por id para la pantalla de detalle. Si la petición
+    // falla, intenta reutilizar la alerta que ya está en la lista local.
+    fun cargarAlerta(id: String) {
+        if (id.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                cargandoDetalle = false,
+                errorDetalle = "No se indicó la alerta a consultar"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                cargandoDetalle = true,
+                errorDetalle = null,
+                alertaSeleccionada = null
+            )
+
+            try {
+                val response = api.getAlert(id)
+                val alerta = response.body()
+                if (response.isSuccessful && alerta != null) {
+                    _uiState.value = _uiState.value.copy(
+                        cargandoDetalle = false,
+                        alertaSeleccionada = alerta
+                    )
+                    return@launch
+                }
+
+                val local = _uiState.value.alertas.firstOrNull { it.id == id }
+                _uiState.value = _uiState.value.copy(
+                    cargandoDetalle = false,
+                    alertaSeleccionada = local,
+                    errorDetalle = if (local == null) {
+                        "No se pudo cargar la alerta (HTTP ${response.code()})"
+                    } else {
+                        null
+                    }
+                )
+            } catch (e: Exception) {
+                val local = _uiState.value.alertas.firstOrNull { it.id == id }
+                _uiState.value = _uiState.value.copy(
+                    cargandoDetalle = false,
+                    alertaSeleccionada = local,
+                    errorDetalle = if (local == null) {
+                        "No se pudo cargar la alerta: ${e.message ?: "sin conexión"}"
+                    } else {
+                        null
+                    }
+                )
+            }
+        }
+    }
+
+    fun limpiarDetalle() {
+        _uiState.value = _uiState.value.copy(
+            alertaSeleccionada = null,
+            cargandoDetalle = false,
+            errorDetalle = null
+        )
     }
 
     // Filtro por categoría según la pestaña

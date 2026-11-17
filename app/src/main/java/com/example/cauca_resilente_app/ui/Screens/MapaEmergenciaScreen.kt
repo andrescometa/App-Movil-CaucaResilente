@@ -60,9 +60,11 @@ import com.example.cauca_resilente_app.ui.components.MapaGoogleView
 import com.example.cauca_resilente_app.ui.components.PuntoMapa
 import com.example.cauca_resilente_app.ui.components.StatusDot
 import com.example.cauca_resilente_app.ui.components.TipoPuntoMapa
+import com.example.cauca_resilente_app.ui.components.inicialesDe
 import com.example.cauca_resilente_app.ui.theme.AppDesign
 import com.example.cauca_resilente_app.ui.theme.appTypography
 import com.google.android.gms.maps.model.LatLng
+import kotlinx.coroutines.delay
 
 private const val LATITUD_POR_DEFECTO = 2.4448
 private const val LONGITUD_POR_DEFECTO = -76.6147
@@ -103,6 +105,14 @@ fun MapaEmergenciaScreen(
         }
     }
 
+    // Refresco periódico de zonas y solicitudes mientras el mapa está visible.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            viewModel.cargarDatos()
+        }
+    }
+
     LaunchedEffect(permisoConcedido) {
         if (permisoConcedido) {
             obtenerUbicacionActual(context)?.let { location ->
@@ -136,7 +146,8 @@ fun MapaEmergenciaScreen(
                                 zona.nivelPeligro?.let { "Peligro $it" },
                                 zona.descripcion
                             ).joinToString(" • "),
-                            tipo = TipoPuntoMapa.ZONA
+                            tipo = TipoPuntoMapa.ZONA,
+                            radioMetros = zona.radioMetros
                         )
                     )
                 }
@@ -158,7 +169,9 @@ fun MapaEmergenciaScreen(
                                 solicitud.nivelPrioridad?.let { "Prioridad $it" },
                                 solicitud.estadoSolicitud
                             ).joinToString(" • "),
-                            tipo = TipoPuntoMapa.SOLICITUD
+                            tipo = TipoPuntoMapa.SOLICITUD,
+                            foto = solicitud.usuario?.foto,
+                            iniciales = inicialesDe(solicitud.usuario?.nombreCompleto)
                         )
                     )
                 }
@@ -173,7 +186,9 @@ fun MapaEmergenciaScreen(
                         longitud = usuario.longitude,
                         titulo = usuario.name ?: "Usuario",
                         descripcion = if (esSocorrista) "Ubicación reportada" else "Contacto de emergencia",
-                        tipo = TipoPuntoMapa.USUARIO
+                        tipo = TipoPuntoMapa.USUARIO,
+                        foto = usuario.foto,
+                        iniciales = inicialesDe(usuario.name)
                     )
                 )
             }
@@ -187,7 +202,25 @@ fun MapaEmergenciaScreen(
                     longitud = ubicacion.longitude,
                     titulo = "Mi ubicación",
                     descripcion = "Tu posición actual",
-                    tipo = TipoPuntoMapa.USUARIO
+                    tipo = TipoPuntoMapa.USUARIO,
+                    foto = SessionManager.getUser()?.foto,
+                    iniciales = inicialesDe(SessionManager.getUser()?.nombreCompleto)
+                )
+            )
+        }
+
+        // La solicitud asignada se muestra siempre, sin importar el filtro,
+        // porque el socorrista debe ver de inmediato la ubicación del usuario.
+        uiState.focoSolicitud?.let { foco ->
+            add(
+                PuntoMapa(
+                    latitud = foco.latitud,
+                    longitud = foco.longitud,
+                    titulo = foco.titulo,
+                    descripcion = foco.descripcion,
+                    tipo = TipoPuntoMapa.SOLICITUD,
+                    foto = foco.foto,
+                    iniciales = foco.iniciales ?: inicialesDe(foco.titulo)
                 )
             )
         }
@@ -205,7 +238,11 @@ fun MapaEmergenciaScreen(
                 zoomInicial = 13.5,
                 mostrarControlesZoom = false,
                 centrarEn = ubicacionActual,
+                centrarEnSolicitud = uiState.focoSolicitud?.let {
+                    LatLng(it.latitud, it.longitud)
+                },
                 solicitudCentrado = centrarEnUbicacion,
+                versionFocoSolicitud = uiState.focoSolicitudVersion,
                 modifier = Modifier.fillMaxSize()
             )
 

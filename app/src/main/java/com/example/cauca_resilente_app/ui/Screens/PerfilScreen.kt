@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
@@ -47,6 +48,7 @@ import com.example.cauca_resilente_app.ui.components.AppChip
 import com.example.cauca_resilente_app.ui.components.AppIconTile
 import com.example.cauca_resilente_app.ui.components.AppScreenHeader
 import com.example.cauca_resilente_app.ui.components.AppSectionHeader
+import com.example.cauca_resilente_app.ui.components.FotoPerfil
 import com.example.cauca_resilente_app.ui.theme.AppDesign
 import com.example.cauca_resilente_app.ui.theme.appTypography
 
@@ -55,6 +57,7 @@ fun PerfilScreen(
     user: User?,
     onBackClick: () -> Unit,
     onMisContactosClick: () -> Unit,
+    onEditarPerfilClick: () -> Unit,
     onConfiguracionClick: () -> Unit,
     onPrivacidadClick: () -> Unit,
     onAcercaDeClick: () -> Unit,
@@ -111,21 +114,14 @@ fun PerfilScreen(
                 AppCard(padding = 16.dp) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(contentAlignment = Alignment.BottomEnd) {
-                            Box(
+                            FotoPerfil(
+                                foto = user?.foto,
+                                iniciales = iniciales,
+                                tamano = 72.dp,
                                 modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(RoundedCornerShape(AppDesign.TileRadius + 6.dp))
-                                    .background(AppDesign.PrimarySoft)
-                                    .border(1.dp, AppDesign.PrimaryBorder, RoundedCornerShape(AppDesign.TileRadius + 6.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = iniciales,
-                                    color = AppDesign.Primary,
-                                    fontSize = type.title,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                                    .border(1.dp, AppDesign.PrimaryBorder, CircleShape)
+                                    .clickable { onEditarPerfilClick() }
+                            )
                             Box(
                                 modifier = Modifier
                                     .size(22.dp)
@@ -243,6 +239,15 @@ fun PerfilScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                OpcionPerfil(
+                    icono = Icons.Filled.Edit,
+                    titulo = "Editar perfil",
+                    subtitulo = "Foto, nombre completo, teléfono y correo",
+                    tint = AppDesign.Primary,
+                    fondo = AppDesign.PrimarySoft,
+                    onClick = onEditarPerfilClick
+                )
+                Spacer(modifier = Modifier.height(10.dp))
                 OpcionPerfil(
                     icono = Icons.Filled.Groups,
                     titulo = "Mis contactos de emergencia",

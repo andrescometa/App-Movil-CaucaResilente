@@ -1,39 +1,74 @@
 package com.example.cauca_resilente_app.ui.Navigation
 
-import com.example.cauca_resilente_app.ui.Screens.SolicitarAyudaScreen
-import android.widget.Toast
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.cauca_resilente_app.location.obtenerUbicacionActual
+import com.example.cauca_resilente_app.location.tienePermisoUbicacion
+import com.example.cauca_resilente_app.ui.Screens.SolicitarAyudaScreen
 import com.example.cauca_resilente_app.BienvenidaScreen
+import com.example.cauca_resilente_app.api.AlertItem
 import com.example.cauca_resilente_app.api.RetrofitInstance
 import com.example.cauca_resilente_app.api.SessionManager
 import com.example.cauca_resilente_app.ui.Screens.HomeScreen
 import com.example.cauca_resilente_app.ui.Screens.InformacionAlertasScreen
+import com.example.cauca_resilente_app.ui.Screens.DetalleAlertaScreen
 import com.example.cauca_resilente_app.ui.Screens.LoginScreen
 import com.example.cauca_resilente_app.ui.Screens.MapaEmergenciaScreen
 import com.example.cauca_resilente_app.ui.Screens.MiEstadoScreen
 import com.example.cauca_resilente_app.ui.Screens.MiUbicacionScreen
 import com.example.cauca_resilente_app.ui.Screens.MisContactosScreen
 import com.example.cauca_resilente_app.ui.Screens.PerfilScreen
+import com.example.cauca_resilente_app.ui.Screens.EditarPerfilScreen
+import com.example.cauca_resilente_app.ui.Screens.EstadoUsuario
 import com.example.cauca_resilente_app.ui.Screens.RegistroScreen
 import com.example.cauca_resilente_app.ui.Screens.RegistroSocorristaScreen
 import com.example.cauca_resilente_app.ui.Screens.SolicitudesAsignadasScreen
+import com.example.cauca_resilente_app.ui.components.SolicitudSocorristaIsla
+import com.example.cauca_resilente_app.ui.components.SolicitudSosIsla
+import com.example.cauca_resilente_app.ui.components.SosResultadoDialog
 import com.example.cauca_resilente_app.ui.ViewModels.AlertasViewModel
 
 import com.example.cauca_resilente_app.ui.ViewModels.AuthViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.ContactosViewModel
+import com.example.cauca_resilente_app.ui.ViewModels.EstadoSosIsla
 import com.example.cauca_resilente_app.ui.ViewModels.EstadoViewModel
+import com.example.cauca_resilente_app.ui.ViewModels.MapaViewModel
+import com.example.cauca_resilente_app.ui.ViewModels.NotificacionSocorristaViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.SolicitarAyudaViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.SolicitudesAsignadasViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.UserViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.ViewModelFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 @Composable
@@ -43,6 +78,7 @@ fun AppNavigation() {
     val usuario by userViewModel.user.collectAsStateWithLifecycle()
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val api = remember { RetrofitInstance.apiService }
+    val mapaViewModel: MapaViewModel = viewModel(factory = ViewModelFactory(api))
     val estadoViewModel: EstadoViewModel = viewModel(factory = ViewModelFactory(api))
     val estadoUiState by estadoViewModel.uiState.collectAsStateWithLifecycle()
     val contactosViewModel: ContactosViewModel = viewModel(factory = ViewModelFactory(api))
@@ -50,13 +86,73 @@ fun AppNavigation() {
     val sesionExpirada by userViewModel.sessionExpired.collectAsStateWithLifecycle()
     val nombreMostrar = SessionManager.getUser()?.nombreCompleto?.takeIf { it.isNotBlank() } ?: "Usuario"
     val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val rutaActual = backStackEntry?.destination?.route
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    val usuarioActual = remember(uiState.isAuthenticated) {
-        SessionManager.getUser()
-    }
+    val solicitarAyudaViewModel: SolicitarAyudaViewModel = viewModel(factory = ViewModelFactory(api))
+    val solicitarAyudaUiState by solicitarAyudaViewModel.uiState.collectAsStateWithLifecycle()
+
+    val notificacionSocorristaViewModel: NotificacionSocorristaViewModel =
+        viewModel(factory = ViewModelFactory(api))
+    val notificacionSocorristaUiState by
+        notificacionSocorristaViewModel.uiState.collectAsStateWithLifecycle()
+
+    val esSocorrista = usuario?.esSocorrista == true
 
     val startDestination = remember {
         if (SessionManager.isLoggedIn()) Screen.Home.route else Screen.Bienvenida.route
+    }
+
+    val enviarSosConUbicacion: () -> Unit = {
+        scope.launch {
+            val ubicacion = obtenerUbicacionActual(context)
+            if (ubicacion != null) {
+                solicitarAyudaViewModel.enviarSosRapido(
+                    ubicacion.latitude,
+                    ubicacion.longitude,
+                    ubicacion.accuracy.toDouble().takeIf { ubicacion.hasAccuracy() }
+                )
+            } else {
+                solicitarAyudaViewModel.notificarSos(
+                    "Activa el GPS para enviar tu ubicación con el SOS"
+                )
+            }
+        }
+    }
+
+    val permisoUbicacionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permisos ->
+        if (permisos.values.any { it } || tienePermisoUbicacion(context)) {
+            enviarSosConUbicacion()
+        } else {
+            solicitarAyudaViewModel.notificarSos(
+                "Se necesita el permiso de ubicación para enviar el SOS"
+            )
+        }
+    }
+
+    val onSosClick: () -> Unit = {
+        estadoViewModel.cambiarEstado(EstadoUsuario.ATRAPADO)
+        if (tienePermisoUbicacion(context)) {
+            enviarSosConUbicacion()
+        } else {
+            permisoUbicacionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    val onVerDetalleAlerta: (AlertItem) -> Unit = { alerta ->
+        val id = alerta.id
+        if (!id.isNullOrBlank()) {
+            navController.navigate(Screen.DetalleAlerta.crearRuta(id))
+        }
     }
 
     LaunchedEffect(uiState.isAuthenticated) {
@@ -73,7 +169,66 @@ fun AppNavigation() {
 
     }
 
+    LaunchedEffect(uiState.isAuthenticated, esSocorrista) {
+        if (SessionManager.isLoggedIn() && esSocorrista) {
+            notificacionSocorristaViewModel.iniciar()
+        } else {
+            notificacionSocorristaViewModel.detener()
+        }
+    }
 
+    LaunchedEffect(notificacionSocorristaUiState.asignada) {
+        val estado = notificacionSocorristaUiState
+        val solicitud = estado.solicitud
+        if (estado.asignada && solicitud != null) {
+            val latitud = solicitud.latitudReal
+            val longitud = solicitud.longitudReal
+            if (latitud != null && longitud != null) {
+                mapaViewModel.enfocarSolicitud(
+                    latitud = latitud,
+                    longitud = longitud,
+                    titulo = "Solicitud asignada · ${solicitud.tipoAyuda ?: "Ayuda"}",
+                    descripcion = listOfNotNull(
+                        solicitud.usuario?.nombreCompleto,
+                        solicitud.ubicacion?.direccionAproximada,
+                        solicitud.nivelPrioridad?.let { "Prioridad $it" }
+                    ).joinToString(" • "),
+                    foto = solicitud.usuario?.foto,
+                    iniciales = solicitud.usuario?.nombreCompleto
+                        ?.trim()
+                        ?.split(" ")
+                        ?.filter { it.isNotBlank() }
+                        ?.take(2)
+                        ?.joinToString("") { it.first().uppercase() }
+                )
+                navController.navigate(Screen.Mapa.route) {
+                    launchSingleTop = true
+                }
+                notificacionSocorristaViewModel.descartarActual()
+            }
+        }
+    }
+
+    // Mientras una solicitud SOS está activa, compartimos la ubicación del
+    // usuario cada pocos segundos para que el socorrista la vea actualizada.
+    LaunchedEffect(solicitarAyudaUiState.sosSolicitudId) {
+        if (solicitarAyudaUiState.sosSolicitudId == null) return@LaunchedEffect
+
+        while (true) {
+            delay(15_000)
+            if (solicitarAyudaViewModel.uiState.value.estadoSosIsla == EstadoSosIsla.FINALIZADO) {
+                break
+            }
+            val ubicacion = obtenerUbicacionActual(context) ?: continue
+            solicitarAyudaViewModel.actualizarUbicacionSos(
+                ubicacion.latitude,
+                ubicacion.longitude,
+                ubicacion.accuracy.toDouble().takeIf { ubicacion.hasAccuracy() }
+            )
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = startDestination) {
 
 
@@ -180,7 +335,7 @@ fun AppNavigation() {
                         4 -> navController.navigate(Screen.Perfil.route)
                     }
                 },
-                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
+                onSosClick = onSosClick
             )
         }
 
@@ -212,7 +367,7 @@ fun AppNavigation() {
                         4 -> navController.navigate(Screen.Perfil.route)
                     }
                 },
-                onSosClick = { }
+                onSosClick = onSosClick
             )
         }
 
@@ -231,7 +386,7 @@ fun AppNavigation() {
                 val viewModel: AlertasViewModel = viewModel(factory = ViewModelFactory(api))
                 InformacionAlertasScreen(
                     onBackClick = { navController.popBackStack() },
-                    onVerMasClick = { /* TODO: detalle */ },
+                    onVerMasClick = onVerDetalleAlerta,
                     viewModel = viewModel,
                     tabInicial = 0,
                     onNavItemSelected = { index ->
@@ -242,7 +397,7 @@ fun AppNavigation() {
                             4 -> navController.navigate(Screen.Perfil.route)
                         }
                     },
-                    onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
+                    onSosClick = onSosClick
                 )
             }
 
@@ -251,7 +406,7 @@ fun AppNavigation() {
                 val viewModel: AlertasViewModel = viewModel(factory = ViewModelFactory(api))
                 InformacionAlertasScreen(
                     onBackClick = { navController.navigate(Screen.Home.route) { popUpTo(0) { inclusive = true } } },
-                    onVerMasClick = { /* TODO: detalle */ },
+                    onVerMasClick = onVerDetalleAlerta,
                     viewModel = viewModel,
                     tabInicial = 1,
                     onNavItemSelected = { index ->
@@ -262,7 +417,39 @@ fun AppNavigation() {
                             4 -> navController.navigate(Screen.Perfil.route)
                         }
                     },
-                    onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
+                    onSosClick = onSosClick
+                )
+            }
+
+            composable(
+                route = Screen.DetalleAlerta.route,
+                arguments = listOf(navArgument("alertaId") { type = NavType.StringType })
+            ) { entrada ->
+                val alertaId = entrada.arguments?.getString("alertaId").orEmpty()
+                val viewModel: AlertasViewModel = viewModel(factory = ViewModelFactory(api))
+                DetalleAlertaScreen(
+                    alertaId = alertaId,
+                    viewModel = viewModel,
+                    onBackClick = { navController.popBackStack() },
+                    onVerEnMapa = { alerta ->
+                        val latitud = alerta.zonaAfectada?.latitud
+                        val longitud = alerta.zonaAfectada?.longitud
+                        if (latitud != null && longitud != null) {
+                            mapaViewModel.enfocarSolicitud(
+                                latitud = latitud,
+                                longitud = longitud,
+                                titulo = "Alerta: ${alerta.title}",
+                                descripcion = listOfNotNull(
+                                    alerta.category,
+                                    alerta.nivelSeveridad?.let { "Severidad $it" },
+                                    alerta.mensaje?.take(120)
+                                ).joinToString(" • ")
+                            )
+                            navController.navigate(Screen.Mapa.route) {
+                                launchSingleTop = true
+                            }
+                        }
+                    }
                 )
             }
 
@@ -273,6 +460,7 @@ fun AppNavigation() {
                 user = user,
                 onBackClick = { navController.popBackStack() },
                 onMisContactosClick = { navController.navigate(Screen.MisContactos.route) },
+                onEditarPerfilClick = { navController.navigate(Screen.EditarPerfil.route) },
                 onConfiguracionClick = { /* TODO */ },
                 onPrivacidadClick = { /* TODO */ },
                 onAcercaDeClick = { /* TODO */ },
@@ -289,7 +477,19 @@ fun AppNavigation() {
                         2 -> navController.navigate(Screen.MisContactos.route)
                     }
                 },
-                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
+                onSosClick = onSosClick
+            )
+        }
+
+        // composable para editar el perfil
+        composable(Screen.EditarPerfil.route) {
+            EditarPerfilScreen(
+                user = usuario ?: SessionManager.getUser(),
+                viewModel = userViewModel,
+                onBackClick = { navController.popBackStack() },
+                onGuardado = {
+                    navController.popBackStack()
+                }
             )
         }
 
@@ -320,15 +520,12 @@ fun AppNavigation() {
                         4 -> navController.navigate(Screen.Perfil.route)
                     }
                 },
-                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) }
+                onSosClick = onSosClick
             )
         }
 
         // composable para el Mapa de emergencia
         composable(Screen.Mapa.route) {
-            val mapaViewModel: com.example.cauca_resilente_app.ui.ViewModels.MapaViewModel =
-                viewModel(factory = ViewModelFactory(api))
-
             MapaEmergenciaScreen(
                 onMenuClick = { /* TODO: abrir drawer */ },
                 onNavItemSelected = { index ->
@@ -338,9 +535,68 @@ fun AppNavigation() {
                         4 -> navController.navigate(Screen.Perfil.route)
                     }
                 },
-                onSosClick = { navController.navigate(Screen.SolicitarAyuda.route) },
+                onSosClick = onSosClick,
                 viewModel = mapaViewModel
             )
         }
+        }
+
+        val solicitudIdSos = solicitarAyudaUiState.sosSolicitudId
+        val solicitudSocorrista = notificacionSocorristaUiState.solicitud
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 8.dp, start = 16.dp, end = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AnimatedVisibility(
+                visible = solicitudIdSos != null && rutaActual != Screen.EditarPerfil.route,
+                enter = fadeIn() + slideInVertically { -it },
+                exit = fadeOut() + slideOutVertically { -it }
+            ) {
+                solicitudIdSos?.let { id ->
+                    SolicitudSosIsla(
+                        estado = solicitarAyudaUiState.estadoSosIsla,
+                        conOrganismo = solicitarAyudaUiState.sosConOrganismo,
+                        solicitudId = id,
+                        onDismiss = { solicitarAyudaViewModel.descartarIslaSos() }
+                    )
+                }
+            }
+
+            AnimatedVisibility(
+                visible = esSocorrista && solicitudSocorrista != null &&
+                    rutaActual != Screen.Mapa.route &&
+                    rutaActual != Screen.Perfil.route &&
+                    rutaActual != Screen.EditarPerfil.route,
+                enter = fadeIn() + slideInVertically { -it },
+                exit = fadeOut() + slideOutVertically { -it }
+            ) {
+                solicitudSocorrista?.let { solicitud ->
+                    SolicitudSocorristaIsla(
+                        solicitud = solicitud,
+                        asignando = notificacionSocorristaUiState.asignando,
+                        asignada = notificacionSocorristaUiState.asignada,
+                        errorAsignacion = notificacionSocorristaUiState.errorAsignacion,
+                        onAsignarme = { notificacionSocorristaViewModel.asignarme() },
+                        onDismiss = { notificacionSocorristaViewModel.descartarActual() }
+                    )
+                }
+            }
+        }
+    }
+
+    val mensajeSos = solicitarAyudaUiState.mensajeSosRapido
+    val sosEnviado = solicitarAyudaUiState.sosRapidoEnviado
+    if (mensajeSos != null && sosEnviado != null) {
+        SosResultadoDialog(
+            enviado = sosEnviado,
+            enCamino = solicitarAyudaUiState.sosRapidoEnCamino,
+            mensaje = mensajeSos,
+            onDismiss = { solicitarAyudaViewModel.consumirMensajeSos() }
+        )
     }
 }
