@@ -1,5 +1,8 @@
 package com.example.cauca_resilente_app.ui.Screens
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -36,7 +39,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PinDrop
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.ShareLocation
@@ -49,25 +51,35 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.cauca_resilente_app.api.ContactoEmergencia
 import com.example.cauca_resilente_app.api.User
+import com.example.cauca_resilente_app.location.flujoUbicacionActual
+import com.example.cauca_resilente_app.location.obtenerDireccion
+import com.example.cauca_resilente_app.location.tienePermisoUbicacion
 import com.example.cauca_resilente_app.ui.components.AppCard
 import com.example.cauca_resilente_app.ui.components.AppChip
 import com.example.cauca_resilente_app.ui.components.AppIconTile
 import com.example.cauca_resilente_app.ui.components.AppPrimaryButton
 import com.example.cauca_resilente_app.ui.components.AppSectionHeader
+import com.example.cauca_resilente_app.ui.components.FotoPerfil
 import com.example.cauca_resilente_app.ui.components.MapaGoogleView
+import com.example.cauca_resilente_app.ui.ViewModels.UbicacionViewModel
 import com.example.cauca_resilente_app.ui.theme.AppDesign
 import com.example.cauca_resilente_app.ui.theme.appTypography
 import com.google.android.gms.maps.model.LatLng
@@ -145,6 +157,7 @@ private data class AccionRapida(
 fun HomeScreen(
     user: User?,
     estadoActual: EstadoUsuario,
+    ubicacionViewModel: UbicacionViewModel,
     contactos: List<ContactoEmergencia> = emptyList(),
     esSocorrista: Boolean = false,
     onSolicitudesAsignadasClick: () -> Unit = {},
@@ -160,8 +173,45 @@ fun HomeScreen(
 ) {
     val horaActual = remember { LocalTime.now().format(FormatoHora) }
     val fechaActual = remember { LocalDate.now().format(FormatoFecha) }
-    val direccion = user?.direccion?.takeIf { it.isNotBlank() }
-        ?: "Calle 5 # 3-15, Popayán"
+    val context = LocalContext.current
+    val ubicacionUiState by ubicacionViewModel.uiState.collectAsStateWithLifecycle()
+    var permisoUbicacion by remember { mutableStateOf(tienePermisoUbicacion(context)) }
+
+    val launcherUbicacion = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { resultado ->
+        permisoUbicacion = resultado.values.any { it } || tienePermisoUbicacion(context)
+    }
+
+    LaunchedEffect(Unit) {
+        if (!tienePermisoUbicacion(context)) {
+            launcherUbicacion.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(permisoUbicacion) {
+        if (!permisoUbicacion) return@LaunchedEffect
+        flujoUbicacionActual(context).collect { location ->
+            val direccion = obtenerDireccion(context, location.latitude, location.longitude)
+            ubicacionViewModel.actualizarUbicacionActual(
+                latitud = location.latitude,
+                longitud = location.longitude,
+                direccion = direccion,
+                precisionMetros = location.accuracy.toDouble(),
+                guardarEnBackend = false
+            )
+        }
+    }
+
+    val direccion = ubicacionUiState.direccionActual
+        .takeIf { it.isNotBlank() && it != "Obteniendo ubicación..." }
+        ?: "Obteniendo tu ubicación en tiempo real..."
+    val horaUbicacion = ubicacionUiState.fechaActual.ifBlank { horaActual }
 
     val acciones = listOf(
         AccionRapida(
@@ -202,6 +252,7 @@ fun HomeScreen(
         containerColor = AppDesign.Background,
         topBar = {
             HomeHeader(
+                user = user,
                 onNotificacionesClick = onNotificacionesClick,
                 onPerfilClick = { onNavItemSelected(4) }
             )
@@ -226,7 +277,9 @@ fun HomeScreen(
             EstadoHeroCard(
                 estado = estadoActual,
                 direccion = direccion,
-                hora = horaActual,
+                hora = horaUbicacion,
+                latitud = ubicacionUiState.latitudActual,
+                longitud = ubicacionUiState.longitudActual,
                 onCambiarEstadoClick = onMiEstadoClick
             )
 
@@ -290,6 +343,7 @@ fun HomeScreen(
 
 @Composable
 private fun HomeHeader(
+    user: User?,
     onNotificacionesClick: () -> Unit,
     onPerfilClick: () -> Unit
 ) {
@@ -345,11 +399,10 @@ private fun HomeHeader(
                     .clickable { onPerfilClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Person,
-                    contentDescription = "Perfil",
-                    tint = AppDesign.Primary,
-                    modifier = Modifier.size(20.dp)
+                FotoPerfil(
+                    foto = user?.foto,
+                    iniciales = inicialesDe(user?.nombreCompleto.orEmpty()),
+                    tamano = 38.dp
                 )
             }
         }
@@ -361,6 +414,8 @@ private fun EstadoHeroCard(
     estado: EstadoUsuario,
     direccion: String,
     hora: String,
+    latitud: Double?,
+    longitud: Double?,
     onCambiarEstadoClick: () -> Unit
 ) {
     val type = appTypography
@@ -414,7 +469,7 @@ private fun EstadoHeroCard(
                 )
                 Spacer(modifier = Modifier.width(7.dp))
                 Text(
-                    text = "Actualizado a las $hora",
+                    text = "Ubicación en vivo • $hora",
                     fontSize = type.bodySmall,
                     color = AppDesign.TextSoft,
                     maxLines = 1,
@@ -432,14 +487,30 @@ private fun EstadoHeroCard(
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = direccion,
-                    fontSize = type.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = AppDesign.Heading,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = direccion,
+                        fontSize = type.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = AppDesign.Heading,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (latitud != null && longitud != null) {
+                        Text(
+                            text = String.format(
+                                Locale.US,
+                                "Lat %.5f  •  Lon %.5f",
+                                latitud,
+                                longitud
+                            ),
+                            fontSize = type.caption,
+                            color = AppDesign.TextSoft,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))

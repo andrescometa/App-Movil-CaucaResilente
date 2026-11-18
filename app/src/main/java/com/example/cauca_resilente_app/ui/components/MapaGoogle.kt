@@ -32,12 +32,13 @@ private const val TAMANO_MARCADOR_PX = 88
 private const val BORDE_MARCADOR_PX = 5
 private const val FOTO_MARCADOR_MAX_PX = 120
 
+
 enum class TipoPuntoMapa {
     ZONA,
+    ALERTA,      // ← nuevo
     SOLICITUD,
     USUARIO
 }
-
 data class PuntoMapa(
     val latitud: Double,
     val longitud: Double,
@@ -136,7 +137,7 @@ fun MapaGoogleView(
 
         puntos.forEach { punto ->
             val posicion = LatLng(punto.latitud, punto.longitud)
-            if (punto.tipo == TipoPuntoMapa.ZONA) {
+            if (punto.tipo == TipoPuntoMapa.ZONA || punto.tipo == TipoPuntoMapa.ALERTA) {
                 val marcador = map.addMarker(
                     MarkerOptions()
                         .position(posicion)
@@ -149,8 +150,8 @@ fun MapaGoogleView(
                         .center(posicion)
                         .radius(punto.radioMetros?.takeIf { it > 0 } ?: RADIO_ZONA_POR_DEFECTO)
                         .strokeWidth(3f)
-                        .strokeColor(AppDesign.Danger.toArgb())
-                        .fillColor(AppDesign.Danger.copy(alpha = 0.22f).toArgb())
+                        .strokeColor(colorBordeZona(punto.tipo))
+                        .fillColor(colorRellenoZona(punto.tipo))
                 )
                 if (marcador != null) marcadoresDeZona[circulo] = marcador
             } else {
@@ -232,14 +233,27 @@ fun MapaGoogleView(
     )
 }
 
+// Las alertas se pintan como círculos amarillos y las zonas como círculos rojos.
+private fun colorBordeZona(tipo: TipoPuntoMapa): Int = when (tipo) {
+    TipoPuntoMapa.ALERTA -> android.graphics.Color.rgb(255, 193, 7)
+    else -> AppDesign.Danger.toArgb()
+}
+
+private fun colorRellenoZona(tipo: TipoPuntoMapa): Int = when (tipo) {
+    TipoPuntoMapa.ALERTA -> android.graphics.Color.argb(64, 255, 193, 7)
+    else -> AppDesign.Danger.copy(alpha = 0.22f).toArgb()
+}
+
 private fun colorCirculo(tipo: TipoPuntoMapa): Int = when (tipo) {
     TipoPuntoMapa.SOLICITUD -> android.graphics.Color.rgb(198, 40, 40)
+    TipoPuntoMapa.ALERTA -> android.graphics.Color.rgb(230, 81, 0)   // naranja
     TipoPuntoMapa.USUARIO -> android.graphics.Color.rgb(21, 72, 156)
     TipoPuntoMapa.ZONA -> android.graphics.Color.rgb(198, 40, 40)
 }
 
 private fun colorPara(tipo: TipoPuntoMapa): Float = when (tipo) {
     TipoPuntoMapa.ZONA -> BitmapDescriptorFactory.HUE_RED
+    TipoPuntoMapa.ALERTA -> BitmapDescriptorFactory.HUE_ORANGE
     TipoPuntoMapa.SOLICITUD -> BitmapDescriptorFactory.HUE_ORANGE
     TipoPuntoMapa.USUARIO -> BitmapDescriptorFactory.HUE_AZURE
 }

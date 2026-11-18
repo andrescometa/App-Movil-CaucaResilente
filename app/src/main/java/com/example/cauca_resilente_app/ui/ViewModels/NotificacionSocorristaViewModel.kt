@@ -2,10 +2,12 @@ package com.example.cauca_resilente_app.ui.ViewModels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.cauca_resilente_app.api.ActualizarAsignacionRequest
 import com.example.cauca_resilente_app.api.CaucaResilienteApiService
 import com.example.cauca_resilente_app.api.CrearAsignacionRequest
 import com.example.cauca_resilente_app.api.SessionManager
 import com.example.cauca_resilente_app.api.SolicitudPendienteSocorrista
+import com.example.cauca_resilente_app.api.StatusRequest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +22,8 @@ data class NotificacionSocorristaUiState(
     val solicitud: SolicitudPendienteSocorrista? = null,
     val asignando: Boolean = false,
     val asignada: Boolean = false,
+    val asignacionId: String? = null,
+    val marcandoSalvo: Boolean = false,
     val errorAsignacion: String? = null
 )
 
@@ -86,7 +90,14 @@ class NotificacionSocorristaViewModel(
                     )
                 )
                 if (response.isSuccessful) {
-                    _uiState.update { it.copy(asignando = false, asignada = true) }
+                    val asignacionId = response.body()?.asignacion?.id
+                    _uiState.update {
+                        it.copy(
+                            asignando = false,
+                            asignada = true,
+                            asignacionId = asignacionId
+                        )
+                    }
                 } else {
                     _uiState.update {
                         it.copy(
@@ -106,6 +117,55 @@ class NotificacionSocorristaViewModel(
         }
     }
 
+    fun marcarUsuarioSalvo() {
+        val estado = _uiState.value
+        if (estado.marcandoSalvo) return
+
+        val asignacionId = estado.asignacionId
+        if (asignacionId.isNullOrBlank()) {
+            _uiState.update {
+                it.copy(errorAsignacion = "No se encontró la asignación para cerrar el aviso")
+            }
+            return
+        }
+
+        _uiState.update { it.copy(marcandoSalvo = true, errorAsignacion = null) }
+        viewModelScope.launch {
+            try {
+                val response = api.actualizarAsignacion(
+                    asignacionId = asignacionId,
+                    request = ActualizarAsignacionRequest(estadoAtencion = "Finalizado")
+                )
+
+                if (response.isSuccessful) {
+                    estado.solicitud?.usuarioId?.takeIf { it.isNotBlank() }?.let { usuarioId ->
+                        runCatching {
+                            api.updateStatus(usuarioId, StatusRequest("A salvo"))
+                        }
+                    }
+                    _uiState.value = NotificacionSocorristaUiState()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            marcandoSalvo = false,
+                            errorAsignacion = mensajeDeError(
+                                response.code(),
+                                response.errorBody()?.string()
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        marcandoSalvo = false,
+                        errorAsignacion = e.message ?: "No se pudo marcar al usuario a salvo"
+                    )
+                }
+            }
+        }
+    }
+
     fun descartarActual() {
         val estado = _uiState.value
         val id = estado.solicitud?.id
@@ -119,6 +179,8 @@ class NotificacionSocorristaViewModel(
                 solicitud = null,
                 asignando = false,
                 asignada = false,
+                asignacionId = null,
+                marcandoSalvo = false,
                 errorAsignacion = null
             )
         }

@@ -8,10 +8,17 @@ import android.location.Address
 import android.location.Geocoder
 import android.location.Location
 import android.os.Build
+import android.os.Looper
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -83,5 +90,41 @@ suspend fun obtenerDireccion(context: Context, latitud: Double, longitud: Double
 
             direccion?.takeIf { it.isNotBlank() } ?: porDefecto
         }.getOrDefault(porDefecto)
+    }
+}
+
+
+/**
+ * Emite la ubicación del usuario de forma continua mientras haya alguien recolectando.
+ * Se usa en Home para mostrar la posición en tiempo real.
+ */
+@SuppressLint("MissingPermission")
+fun flujoUbicacionActual(
+    context: Context,
+    intervaloMs: Long = 20_000L
+): Flow<Location> = callbackFlow {
+    if (!tienePermisoUbicacion(context)) {
+        close()
+        return@callbackFlow
+    }
+
+    val cliente = LocationServices.getFusedLocationProviderClient(context)
+    val solicitud = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervaloMs)
+        .setMinUpdateIntervalMillis(intervaloMs / 2)
+        .setMinUpdateDistanceMeters(10f)
+        .build()
+
+    val callback = object : LocationCallback() {
+        override fun onLocationResult(resultado: LocationResult) {
+            resultado.lastLocation?.let { ubicacion ->
+                trySend(ubicacion)
+            }
+        }
+    }
+
+    cliente.requestLocationUpdates(solicitud, callback, Looper.getMainLooper())
+
+    awaitClose {
+        cliente.removeLocationUpdates(callback)
     }
 }

@@ -84,15 +84,40 @@ class AuthViewModel : ViewModel() {
     private fun mensajeError(response: retrofit2.Response<*>): String? {
         val cuerpo = response.errorBody()?.string() ?: return null
         return runCatching {
-            org.json.JSONObject(cuerpo).optString("mensaje").takeIf { it.isNotBlank() }
+            val json = org.json.JSONObject(cuerpo)
+            val mensaje = json.optString("mensaje").takeIf { it.isNotBlank() }
+            val detalle = json.optString("error").takeIf { it.isNotBlank() }
+            when {
+                mensaje != null && detalle != null -> "$mensaje ($detalle)"
+                mensaje != null -> mensaje
+                detalle != null -> detalle
+                else -> null
+            }
         }.getOrNull()
     }
+
+    private fun nombreNormalizado(): String =
+        _uiState.value.nombre.trim().replace(Regex("\\s+"), " ")
+
+    private fun emailNormalizado(): String =
+        _uiState.value.email.trim().lowercase()
+
+    private fun telefonoNormalizado(): String =
+        _uiState.value.telefono.replace(Regex("[^0-9+]"), "")
+
+    private fun tipoDocumentoCodigo(): String =
+        _uiState.value.tipoDocumento
+            .substringBefore("-")
+            .trim()
+            .uppercase()
+            .takeIf { it.isNotBlank() }
+            ?: "CC"
 
     private fun validarLogin(): String? {
         val state = _uiState.value
         return when {
             state.email.isBlank() -> "El correo electrónico es obligatorio"
-            !esEmailValido(state.email) -> "El correo electrónico no es válido"
+            !esEmailValido(state.email.trim()) -> "El correo electrónico no es válido"
             state.password.isBlank() -> "La contraseña es obligatoria"
             state.password.length < 6 -> "La contraseña debe tener al menos 6 caracteres"
             else -> null
@@ -104,9 +129,9 @@ class AuthViewModel : ViewModel() {
         return when {
             state.nombre.isBlank() -> "El nombre es obligatorio"
             state.telefono.isBlank() -> "El teléfono es obligatorio"
-            state.telefono.length < 10 -> "El teléfono debe tener al menos 10 dígitos"
+            telefonoNormalizado().length < 10 -> "El teléfono debe tener al menos 10 dígitos"
             state.email.isBlank() -> "El correo electrónico es obligatorio"
-            !esEmailValido(state.email) -> "El correo electrónico no es válido"
+            !esEmailValido(state.email.trim()) -> "El correo electrónico no es válido"
             state.password.isBlank() -> "La contraseña es obligatoria"
             state.password.length < 6 -> "La contraseña debe tener al menos 6 caracteres"
             state.password != state.confirmPassword -> "Las contraseñas no coinciden"
@@ -124,9 +149,9 @@ class AuthViewModel : ViewModel() {
             state.ciudad.isBlank() -> "La ciudad es obligatoria"
             state.tipoSangre.isBlank() -> "El tipo de sangre es obligatorio"
             state.telefono.isBlank() -> "El teléfono es obligatorio"
-            state.telefono.length < 10 -> "El teléfono debe tener al menos 10 dígitos"
+            telefonoNormalizado().length < 10 -> "El teléfono debe tener al menos 10 dígitos"
             state.email.isBlank() -> "El correo electrónico es obligatorio"
-            !esEmailValido(state.email) -> "El correo electrónico no es válido"
+            !esEmailValido(state.email.trim()) -> "El correo electrónico no es válido"
             state.password.isBlank() -> "La contraseña es obligatoria"
             state.password.length < 6 -> "La contraseña debe tener al menos 6 caracteres"
             state.password != state.confirmPassword -> "Las contraseñas no coinciden"
@@ -147,7 +172,7 @@ class AuthViewModel : ViewModel() {
             try {
                 val response = RetrofitInstance.apiService.login(
                     com.example.cauca_resilente_app.api.LoginRequest(
-                        _uiState.value.email, _uiState.value.password
+                        emailNormalizado(), _uiState.value.password
                     )
                 )
                 if (response.isSuccessful && response.body() != null) {
@@ -180,9 +205,9 @@ class AuthViewModel : ViewModel() {
 
         enviarRegistro(
             com.example.cauca_resilente_app.api.RegisterRequest(
-                name = _uiState.value.nombre,
-                email = _uiState.value.email,
-                phone = _uiState.value.telefono,
+                name = nombreNormalizado(),
+                email = emailNormalizado(),
+                phone = telefonoNormalizado(),
                 password = _uiState.value.password,
                 rol = "usuario"
             )
@@ -198,15 +223,15 @@ class AuthViewModel : ViewModel() {
 
         enviarRegistro(
             com.example.cauca_resilente_app.api.RegisterRequest(
-                name = _uiState.value.nombre,
-                email = _uiState.value.email,
-                phone = _uiState.value.telefono,
+                name = nombreNormalizado(),
+                email = emailNormalizado(),
+                phone = telefonoNormalizado(),
                 password = _uiState.value.password,
                 rol = "socorrista",
-                tipoDocumento = _uiState.value.tipoDocumento,
-                identificacion = _uiState.value.identificacion,
-                ciudad = _uiState.value.ciudad,
-                tipoSangre = _uiState.value.tipoSangre
+                tipoDocumento = tipoDocumentoCodigo(),
+                identificacion = _uiState.value.identificacion.filter { it.isDigit() },
+                ciudad = _uiState.value.ciudad.trim(),
+                tipoSangre = _uiState.value.tipoSangre.trim().uppercase()
             )
         )
     }

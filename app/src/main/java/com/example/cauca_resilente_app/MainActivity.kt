@@ -1,6 +1,7 @@
 package com.example.cauca_resilente_app
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -47,9 +48,25 @@ import com.example.cauca_resilente_app.ui.Navigation.AppNavigation
 import com.example.cauca_resilente_app.ui.components.ShieldLogo
 import com.example.cauca_resilente_app.ui.theme.AppColors
 import com.example.cauca_resilente_app.ui.theme.Cauca_Resilente_AppTheme
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+
+
+// En onCreate, después de pedir el permiso POST_NOTIFICATIONS
+                listOf("alertas_sismo", "alertas_cauca", "alertas_hidro", "alertas_orden_publico").forEach { topic ->
+                    FirebaseMessaging.getInstance().subscribeToTopic(topic)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                Log.d("FCM", "Suscrito a $topic")
+                            } else {
+                                Log.e("FCM", "Error suscribiendo a $topic", task.exception)
+                            }
+                        }
+                }
+
+
         super.onCreate(savedInstanceState)
         SessionManager.init(this)
         enableEdgeToEdge()

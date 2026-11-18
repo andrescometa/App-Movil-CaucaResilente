@@ -6,8 +6,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +52,7 @@ import com.example.cauca_resilente_app.ui.Screens.EstadoUsuario
 import com.example.cauca_resilente_app.ui.Screens.RegistroScreen
 import com.example.cauca_resilente_app.ui.Screens.RegistroSocorristaScreen
 import com.example.cauca_resilente_app.ui.Screens.SolicitudesAsignadasScreen
+import com.example.cauca_resilente_app.ui.components.NubeArrastrable
 import com.example.cauca_resilente_app.ui.components.SolicitudSocorristaIsla
 import com.example.cauca_resilente_app.ui.components.SolicitudSosIsla
 import com.example.cauca_resilente_app.ui.components.SosResultadoDialog
@@ -65,6 +66,7 @@ import com.example.cauca_resilente_app.ui.ViewModels.MapaViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.NotificacionSocorristaViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.SolicitarAyudaViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.SolicitudesAsignadasViewModel
+import com.example.cauca_resilente_app.ui.ViewModels.UbicacionViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.UserViewModel
 import com.example.cauca_resilente_app.ui.ViewModels.ViewModelFactory
 import kotlinx.coroutines.delay
@@ -82,12 +84,22 @@ fun AppNavigation() {
     val estadoViewModel: EstadoViewModel = viewModel(factory = ViewModelFactory(api))
     val estadoUiState by estadoViewModel.uiState.collectAsStateWithLifecycle()
     val contactosViewModel: ContactosViewModel = viewModel(factory = ViewModelFactory(api))
+    val ubicacionViewModel: UbicacionViewModel = viewModel(factory = ViewModelFactory(api))
     val contactosUiState by contactosViewModel.uiState.collectAsStateWithLifecycle()
     val sesionExpirada by userViewModel.sessionExpired.collectAsStateWithLifecycle()
     val nombreMostrar = SessionManager.getUser()?.nombreCompleto?.takeIf { it.isNotBlank() } ?: "Usuario"
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val rutaActual = backStackEntry?.destination?.route
+    val rutasPublicas = remember {
+        setOf(
+            Screen.Bienvenida.route,
+            Screen.Login.route,
+            Screen.Registro.route,
+            Screen.RegistroSocorrista.route
+        )
+    }
+    val mostrarNubes = rutaActual !in rutasPublicas
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -157,6 +169,7 @@ fun AppNavigation() {
 
     LaunchedEffect(uiState.isAuthenticated) {
         if (uiState.isAuthenticated) {
+            userViewModel.reload()
             // Si ya estamos en Home, no navegues (evita rebote)
             val currentRoute = navController.currentDestination?.route
             if (currentRoute != Screen.Home.route) {
@@ -306,7 +319,7 @@ fun AppNavigation() {
 
         // composable para la ruta de Home
         composable(Screen.Home.route) {
-            val user = SessionManager.getUser() ?: usuario
+            val user = usuario ?: SessionManager.getUser()
             val socorrista = user?.esSocorrista == true
 
             LaunchedEffect(Unit) {
@@ -316,6 +329,7 @@ fun AppNavigation() {
             HomeScreen(
                 user = user,
                 estadoActual = estadoUiState.estadoActual,
+                ubicacionViewModel = ubicacionViewModel,
                 contactos = contactosUiState.contactos,
                 esSocorrista = socorrista,
                 onSolicitudesAsignadasClick = {
@@ -466,6 +480,9 @@ fun AppNavigation() {
                 onAcercaDeClick = { /* TODO */ },
                 onCerrarSesionClick = {
                     userViewModel.logout()
+                    authViewModel.resetEstado()
+                    solicitarAyudaViewModel.descartarIslaSos()
+                    notificacionSocorristaViewModel.detener()
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true } // limpia toda la pila
                     }
@@ -505,9 +522,6 @@ fun AppNavigation() {
 
         // composobale para Mi ubicacion
         composable(Screen.MiUbicacion.route) {
-            val ubicacionViewModel: com.example.cauca_resilente_app.ui.ViewModels.UbicacionViewModel =
-                viewModel(factory = ViewModelFactory(api))
-
             MiUbicacionScreen(
                 onBackClick = { navController.popBackStack() },
                 onVerEnMapaClick = { navController.navigate(Screen.Mapa.route) },
@@ -552,38 +566,45 @@ fun AppNavigation() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AnimatedVisibility(
-                visible = solicitudIdSos != null && rutaActual != Screen.EditarPerfil.route,
-                enter = fadeIn() + slideInVertically { -it },
-                exit = fadeOut() + slideOutVertically { -it }
-            ) {
-                solicitudIdSos?.let { id ->
-                    SolicitudSosIsla(
-                        estado = solicitarAyudaUiState.estadoSosIsla,
-                        conOrganismo = solicitarAyudaUiState.sosConOrganismo,
-                        solicitudId = id,
-                        onDismiss = { solicitarAyudaViewModel.descartarIslaSos() }
-                    )
+            NubeArrastrable {
+                AnimatedVisibility(
+                    visible = mostrarNubes && solicitudIdSos != null &&
+                        rutaActual != Screen.EditarPerfil.route,
+                    enter = fadeIn() + scaleIn(initialScale = 0.85f),
+                    exit = fadeOut() + scaleOut(targetScale = 0.85f)
+                ) {
+                    solicitudIdSos?.let { id ->
+                        SolicitudSosIsla(
+                            estado = solicitarAyudaUiState.estadoSosIsla,
+                            conOrganismo = solicitarAyudaUiState.sosConOrganismo,
+                            solicitudId = id,
+                            onDismiss = { solicitarAyudaViewModel.descartarIslaSos() }
+                        )
+                    }
                 }
             }
 
-            AnimatedVisibility(
-                visible = esSocorrista && solicitudSocorrista != null &&
-                    rutaActual != Screen.Mapa.route &&
-                    rutaActual != Screen.Perfil.route &&
-                    rutaActual != Screen.EditarPerfil.route,
-                enter = fadeIn() + slideInVertically { -it },
-                exit = fadeOut() + slideOutVertically { -it }
-            ) {
-                solicitudSocorrista?.let { solicitud ->
-                    SolicitudSocorristaIsla(
-                        solicitud = solicitud,
-                        asignando = notificacionSocorristaUiState.asignando,
-                        asignada = notificacionSocorristaUiState.asignada,
-                        errorAsignacion = notificacionSocorristaUiState.errorAsignacion,
-                        onAsignarme = { notificacionSocorristaViewModel.asignarme() },
-                        onDismiss = { notificacionSocorristaViewModel.descartarActual() }
-                    )
+            NubeArrastrable {
+                AnimatedVisibility(
+                    visible = mostrarNubes && esSocorrista && solicitudSocorrista != null &&
+                        rutaActual != Screen.Mapa.route &&
+                        rutaActual != Screen.Perfil.route &&
+                        rutaActual != Screen.EditarPerfil.route,
+                    enter = fadeIn() + scaleIn(initialScale = 0.85f),
+                    exit = fadeOut() + scaleOut(targetScale = 0.85f)
+                ) {
+                    solicitudSocorrista?.let { solicitud ->
+                        SolicitudSocorristaIsla(
+                            solicitud = solicitud,
+                            asignando = notificacionSocorristaUiState.asignando,
+                            asignada = notificacionSocorristaUiState.asignada,
+                            marcandoSalvo = notificacionSocorristaUiState.marcandoSalvo,
+                            errorAsignacion = notificacionSocorristaUiState.errorAsignacion,
+                            onAsignarme = { notificacionSocorristaViewModel.asignarme() },
+                            onMarcarSalvo = { notificacionSocorristaViewModel.marcarUsuarioSalvo() },
+                            onDismiss = { notificacionSocorristaViewModel.descartarActual() }
+                        )
+                    }
                 }
             }
         }

@@ -95,6 +95,7 @@ fun MiUbicacionScreen(
     }
 
     LaunchedEffect(Unit) {
+        viewModel.cargarHistorial()
         if (!tienePermisoUbicacion(context)) {
             launcher.launch(
                 arrayOf(

@@ -89,6 +89,7 @@ fun InformacionAlertasScreen(
         }
     }
 
+
     LaunchedEffect(Unit) {
         AlertRefreshBus.events.collect {
             viewModel.cargarAlertas()

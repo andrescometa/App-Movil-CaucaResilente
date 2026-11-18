@@ -49,8 +49,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
         Log.d("FCM", "Mensaje recibido en primer plano: ${remoteMessage.data}")
+
         AlertRefreshBus.triggerRefresh()
-        // TODO: emitir evento para que el ViewModel recargue alertas.
-        // Ejemplo: AlertRefreshBus.triggerRefresh()
     }
 }

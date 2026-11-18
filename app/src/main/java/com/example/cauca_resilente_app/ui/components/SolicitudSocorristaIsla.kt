@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DragIndicator
 import androidx.compose.material.icons.filled.Emergency
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -56,8 +57,10 @@ fun SolicitudSocorristaIsla(
     solicitud: SolicitudPendienteSocorrista,
     asignando: Boolean,
     asignada: Boolean,
+    marcandoSalvo: Boolean = false,
     errorAsignacion: String?,
     onAsignarme: () -> Unit,
+    onMarcarSalvo: () -> Unit = {},
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -141,6 +144,15 @@ fun SolicitudSocorristaIsla(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                Icon(
+                    imageVector = Icons.Filled.DragIndicator,
+                    contentDescription = "Arrastrar aviso",
+                    tint = Color.White.copy(alpha = 0.35f),
+                    modifier = Modifier.size(18.dp)
+                )
+
+                Spacer(modifier = Modifier.width(2.dp))
 
                 Icon(
                     imageVector = if (expandida) {
@@ -291,8 +303,47 @@ fun SolicitudSocorristaIsla(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(AppDesign.ButtonRadius))
+                                .background(AppDesign.Success)
+                                .clickable(enabled = !marcandoSalvo) { onMarcarSalvo() }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (marcandoSalvo) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = Color.White
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    text = if (marcandoSalvo) {
+                                        "Marcando a salvo..."
+                                    } else {
+                                        "Usuario a salvo"
+                                    },
+                                    color = Color.White,
+                                    fontSize = type.action,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(AppDesign.ButtonRadius))
                                 .background(Color.White.copy(alpha = 0.12f))
-                                .clickable { onDismiss() }
+                                .clickable(enabled = !marcandoSalvo) { onDismiss() }
                                 .padding(vertical = 12.dp),
                             contentAlignment = Alignment.Center
                         ) {

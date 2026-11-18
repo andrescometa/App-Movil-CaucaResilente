@@ -58,7 +58,9 @@ interface CaucaResilienteApiService {
     // Alertas
 
 
-    //*********************************************************************************
+    @GET("api/map/alerts")
+    suspend fun getAlertasMapa(): Response<List<MapPoint>>
+
 
     // ===== SOLICITAR AYUDA =====
     @POST("api/solicitud")
@@ -97,11 +99,34 @@ interface CaucaResilienteApiService {
         @Path("solicitudId") solicitudId: String
     ): Response<SeguimientoSolicitudResponse>
 
+    @PUT("api/asignaciones/{id}")
+    suspend fun actualizarAsignacion(
+        @Path("id") asignacionId: String,
+        @Body request: ActualizarAsignacionRequest
+    ): Response<ActualizarAsignacionResponse>
+
     // ===== CONTACTOS DE EMERGENCIA =====
     @GET("api/contactos/{usuarioId}")
     suspend fun getContactosEmergencia(
         @Path("usuarioId") usuarioId: String
     ): Response<ContactosEmergenciaResponse>
+
+    @POST("api/contactos")
+    suspend fun crearContacto(
+        @Body request: CrearContactoRequest
+    ): Response<ContactoEmergenciaResponse>
+
+    @PUT("api/contactos/{id}")
+    suspend fun actualizarContacto(
+        @Path("id") contactoId: String,
+        @Body request: CrearContactoRequest
+    ): Response<ContactoEmergenciaResponse>
+
+    @DELETE("api/contactos/{id}")
+    suspend fun eliminarContacto(
+        @Path("id") contactoId: String,
+        @Query("usuario_id") usuarioId: String
+    ): Response<Unit>
 
     // ===== HISTORIAL DE UBICACIONES =====
     @POST("api/ubicaciones")

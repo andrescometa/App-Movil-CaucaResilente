@@ -35,6 +35,7 @@ data class MapaUiState(
     val zonas: List<ZonaRiesgoMapa> = emptyList(),
     val solicitudes: List<SolicitudMapa> = emptyList(),
     val usuarios: List<MapPoint> = emptyList(),
+    val alertas: List<MapPoint> = emptyList(),  // ← nuevo
     val focoSolicitud: FocoSolicitudMapa? = null,
     val focoSolicitudVersion: Int = 0,
     val isLoading: Boolean = false,
@@ -42,7 +43,6 @@ data class MapaUiState(
     val latitudActual: Double = 2.4448,
     val longitudActual: Double = -76.6147
 )
-
 class MapaViewModel(private val api: CaucaResilienteApiService) : ViewModel() {
     private val _uiState = MutableStateFlow(MapaUiState())
     val uiState: StateFlow<MapaUiState> = _uiState.asStateFlow()
@@ -92,24 +92,24 @@ class MapaViewModel(private val api: CaucaResilienteApiService) : ViewModel() {
             try {
                 supervisorScope {
                     val zonasDeferred = async { api.getZonasRiesgo() }
-                    val usuariosDeferred = async {
-                        api.getMapPoints()
-                    }
+                    val usuariosDeferred = async { api.getMapPoints() }
+                    val alertasDeferred = async { api.getAlertasMapa() }
                     val solicitudesDeferred = if (esSocorrista) {
                         async { api.getSolicitudesMapa() }
-                    } else {
-                        null
-                    }
+                    } else null
 
                     val zonasResp = zonasDeferred.await()
                     val usuariosResp = usuariosDeferred.await()
+                    val alertasResp = alertasDeferred.await()
                     val solicitudesResp = solicitudesDeferred?.await()
 
                     val falloSolicitudes = solicitudesResp != null && !solicitudesResp.isSuccessful
-                    if (!zonasResp.isSuccessful || !usuariosResp.isSuccessful || falloSolicitudes) {
+                    if (!zonasResp.isSuccessful || !usuariosResp.isSuccessful ||
+                        !alertasResp.isSuccessful || falloSolicitudes) {
                         val errores = listOfNotNull(
                             if (!zonasResp.isSuccessful) "zonas (${zonasResp.code()})" else null,
                             if (!usuariosResp.isSuccessful) "usuarios (${usuariosResp.code()})" else null,
+                            if (!alertasResp.isSuccessful) "alertas (${alertasResp.code()})" else null,
                             if (falloSolicitudes) "solicitudes (${solicitudesResp?.code()})" else null
                         ).joinToString(", ")
 
@@ -118,11 +118,18 @@ class MapaViewModel(private val api: CaucaResilienteApiService) : ViewModel() {
                             errorMessage = "No se pudieron cargar los datos del mapa: $errores"
                         )
                     } else {
+                        // /api/map/points devuelve alertas, zonas y usuarios en una
+                        // sola lista; solo los puntos de tipo "usuario" deben ir a
+                        // los contactos del mapa para no pintar zonas como personas.
+                        val soloUsuarios = usuariosResp.body().orEmpty()
+                            .filter { punto -> punto.type.trim().equals("usuario", ignoreCase = true) }
+
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             zonas = zonasResp.body()?.zonas.orEmpty(),
                             solicitudes = solicitudesResp?.body()?.solicitudes.orEmpty(),
-                            usuarios = usuariosResp.body().orEmpty()
+                            usuarios = soloUsuarios,
+                            alertas = alertasResp.body().orEmpty()   // ← nuevo
                         )
                     }
                 }

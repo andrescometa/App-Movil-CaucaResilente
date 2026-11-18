@@ -247,12 +247,22 @@ class SolicitarAyudaViewModel(private val api: CaucaResilienteApiService) : View
             else -> EstadoSosIsla.EN_ESPERA
         }
 
-        _uiState.value = _uiState.value.copy(
-            estadoSosIsla = nuevoEstado,
-            sosRapidoEnCamino = nuevoEstado == EstadoSosIsla.EN_CAMINO,
-            sosConOrganismo = !asignacion?.organismoId.isNullOrBlank()
-        )
-        return nuevoEstado == EstadoSosIsla.FINALIZADO
+        val finalizado = nuevoEstado == EstadoSosIsla.FINALIZADO
+        if (finalizado) {
+            _uiState.value = _uiState.value.copy(
+                sosSolicitudId = null,
+                estadoSosIsla = EstadoSosIsla.EN_ESPERA,
+                sosConOrganismo = false,
+                sosRapidoEnCamino = false
+            )
+        } else {
+            _uiState.value = _uiState.value.copy(
+                estadoSosIsla = nuevoEstado,
+                sosRapidoEnCamino = nuevoEstado == EstadoSosIsla.EN_CAMINO,
+                sosConOrganismo = !asignacion?.organismoId.isNullOrBlank()
+            )
+        }
+        return finalizado
     }
 
     fun descartarIslaSos() {

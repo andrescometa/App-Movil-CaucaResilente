@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
@@ -105,7 +104,7 @@ fun MapaEmergenciaScreen(
         }
     }
 
-    // Refresco periódico de zonas y solicitudes mientras el mapa está visible.
+    // Refresco periódico de zonas, alertas y solicitudes mientras el mapa está visible.
     LaunchedEffect(Unit) {
         while (true) {
             delay(60_000)
@@ -131,6 +130,7 @@ fun MapaEmergenciaScreen(
 
     val mostrarTodo = uiState.filtroSeleccionado == FiltroMapa.TODOS
     val puntos = buildList {
+        // --- Zonas de riesgo ---
         if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.ALERTAS) {
             uiState.zonas.forEach { zona ->
                 val latitud = zona.latitud
@@ -154,6 +154,27 @@ fun MapaEmergenciaScreen(
             }
         }
 
+        // --- Alertas de los workers (IDEAM, USGS, Defensoría) ---
+        if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.ALERTAS) {
+            uiState.alertas.forEach { alerta ->
+                add(
+                    PuntoMapa(
+                        latitud = alerta.latitude,
+                        longitud = alerta.longitude,
+                        titulo = alerta.name ?: "Alerta",
+                        descripcion = listOfNotNull(
+                            alerta.message,
+                            alerta.severity?.let { "Severidad $it" },
+                            alerta.source?.takeIf { it.isNotBlank() }?.let { "Fuente: $it" }
+                        ).joinToString(" • "),
+                        tipo = TipoPuntoMapa.ALERTA,
+                        radioMetros = alerta.radius
+                    )
+                )
+            }
+        }
+
+        // --- Solicitudes de ayuda (solo socorristas) ---
         if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.AYUDA) {
             uiState.solicitudes.forEach { solicitud ->
                 val latitud = solicitud.latitud
@@ -178,6 +199,7 @@ fun MapaEmergenciaScreen(
             }
         }
 
+        // --- Usuarios / contactos ---
         if (mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.USUARIOS) {
             uiState.usuarios.forEach { usuario ->
                 add(
@@ -194,6 +216,7 @@ fun MapaEmergenciaScreen(
             }
         }
 
+        // --- Mi ubicación ---
         val ubicacion = ubicacionActual
         if ((mostrarTodo || uiState.filtroSeleccionado == FiltroMapa.USUARIOS) && ubicacion != null) {
             add(
@@ -209,8 +232,7 @@ fun MapaEmergenciaScreen(
             )
         }
 
-        // La solicitud asignada se muestra siempre, sin importar el filtro,
-        // porque el socorrista debe ver de inmediato la ubicación del usuario.
+        // --- Foco de solicitud asignada (siempre visible para socorristas) ---
         uiState.focoSolicitud?.let { foco ->
             add(
                 PuntoMapa(
@@ -345,7 +367,7 @@ fun MapaEmergenciaScreen(
                         FiltroChip(
                             titulo = when {
                                 !esSocorrista && filtro == FiltroMapa.USUARIOS -> "Contactos"
-                                !esSocorrista && filtro == FiltroMapa.ALERTAS -> "Zonas"
+                                !esSocorrista && filtro == FiltroMapa.ALERTAS -> "Riesgos"
                                 else -> filtro.titulo
                             },
                             seleccionado = uiState.filtroSeleccionado == filtro,
@@ -368,7 +390,7 @@ fun MapaEmergenciaScreen(
                     StatusDot(AppDesign.Primary, size = 6.dp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "${uiState.usuarios.size} contactos cerca • ${uiState.zonas.size} zonas",
+                        "${uiState.usuarios.size} contactos • ${uiState.zonas.size} zonas • ${uiState.alertas.size} alertas",
                         color = AppDesign.TextSoft,
                         fontSize = type.caption,
                         fontWeight = FontWeight.Bold

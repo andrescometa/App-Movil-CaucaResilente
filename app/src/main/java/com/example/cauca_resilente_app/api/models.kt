@@ -55,6 +55,7 @@ data class User(
     val nombreCompleto: String
         get() = listOf(name, apellidos.orEmpty())
             .filter { it.isNotBlank() }
+            .distinct()
             .joinToString(" ")
 
     val esSocorrista: Boolean
@@ -106,14 +107,23 @@ data class SolicitudCreada(
 )
 
 // --- Modelo para el Mapa (Interfaz 04) ---
+
 data class MapPoint(
     @SerializedName("id") val id: String,
     @SerializedName("latitude") val latitude: Double,
     @SerializedName("longitude") val longitude: Double,
-    @SerializedName("type") val type: String, // "usuario", "ayuda", "alerta"
-    @SerializedName("intensity") val intensity: Int, // Para los círculos de colores (1-10)
+    @SerializedName("type") val type: String = "usuario",
+    @SerializedName("intensity") val intensity: Int = 1,
     @SerializedName("name") val name: String? = null,
-    @SerializedName("photo") val foto: String? = null
+    @SerializedName("photo") val foto: String? = null,
+    // Campos nuevos para alertas
+    @SerializedName("category") val category: String? = null,
+    @SerializedName("severity") val severity: String? = null,
+    @SerializedName("source") val source: String? = null,
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("radius") val radius: Double? = null,
+    @SerializedName("relevance") val relevance: String? = null,
+    @SerializedName("url") val url: String? = null
 )
 
 // --- Modelo para Alertas y Noticias (Interfaz 08) ---
@@ -201,6 +211,19 @@ data class ContactosEmergenciaResponse(
     @SerializedName("mensaje") val mensaje: String? = null,
     @SerializedName("total") val total: Int? = null,
     @SerializedName("contactos") val contactos: List<ContactoEmergencia>? = null
+)
+
+data class CrearContactoRequest(
+    @SerializedName("usuario_id") val usuarioId: String,
+    @SerializedName("nombre_contacto") val nombre: String,
+    @SerializedName("telefono_contacto") val telefono: String,
+    @SerializedName("parentesco") val parentesco: String? = null,
+    @SerializedName("prioridad") val prioridad: Int? = null
+)
+
+data class ContactoEmergenciaResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("contacto") val contacto: ContactoEmergencia? = null
 )
 
 // --- Modelos para el mapa real (OpenStreetMap) ---
@@ -304,6 +327,7 @@ data class UsuarioSolicitud(
     val nombreCompleto: String
         get() = listOf(nombres.orEmpty(), apellidos.orEmpty())
             .filter { it.isNotBlank() }
+            .distinct()
             .joinToString(" ")
             .ifBlank { "Usuario" }
 }
@@ -347,6 +371,15 @@ data class CrearAsignacionRequest(
 )
 
 data class CrearAsignacionResponse(
+    @SerializedName("mensaje") val mensaje: String? = null,
+    @SerializedName("asignacion") val asignacion: AsignacionSeguimiento? = null
+)
+
+data class ActualizarAsignacionRequest(
+    @SerializedName("estado_atencion") val estadoAtencion: String
+)
+
+data class ActualizarAsignacionResponse(
     @SerializedName("mensaje") val mensaje: String? = null,
     @SerializedName("asignacion") val asignacion: AsignacionSeguimiento? = null
 )
